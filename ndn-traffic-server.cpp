@@ -18,7 +18,7 @@ class NdnTrafficServer
 {
 public:
 
-  NdnTrafficServer( char* programName )
+  NdnTrafficServer( char* programName ) : ioService_(new boost::asio::io_service), face_(ioService_)
   {
     std::stringstream randomId;
     std::srand(std::time(0));
@@ -28,8 +28,6 @@ public:
     contentDelayTime_ = getDefaultContentDelayTime();
     logLocation_ = "";
     configurationFile_ = "";
-    ioService_ = ptr_lib::make_shared<boost::asio::io_service>();
-    face_ = Face(ioService_);
   }
 
   NdnTrafficServer()

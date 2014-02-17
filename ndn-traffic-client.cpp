@@ -11,8 +11,12 @@
 #include <vector>
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/bind.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <ndn-cpp-dev/face.hpp>
+#include <ndn-cpp-dev/exclude.hpp>
+#include <ndn-cpp-dev/name-component.hpp>
 #include <ndn-cpp-dev/security/key-chain.hpp>
 
 using namespace ndn;
@@ -33,16 +37,36 @@ public:
       logFile_.close();
   }
 
+  static std::string
+  getTimestamp()
+  {
+    boost::posix_time::ptime now;
+    now = boost::posix_time::second_clock::local_time();
+    return to_simple_string(now);
+  }
+
   void
-  log( std::string logLine )
+  log( std::string logLine, bool printTime, bool printToConsole )
   {
     if( logLocation_.length() > 0 )
     {
+      if (printTime)
+        logFile_ << getTimestamp() << " - ";
       logFile_ << logLine << std::endl;
       logFile_.flush();
+      if (printToConsole)
+      {
+        if (printTime)
+          std::cout << getTimestamp() << " - ";
+        std::cout << logLine << std::endl;
+      }
     }
     else
+    {
+      if (printTime)
+        std::cout << getTimestamp() << " - ";
       std::cout << logLine << std::endl;
+    }
   }
 
   void
@@ -94,7 +118,7 @@ class NdnTrafficClient
 {
 public:
 
-  NdnTrafficClient( char* programName )
+  NdnTrafficClient( char* programName ) : ioService_(new boost::asio::io_service), face_(ioService_)
   {
     std::srand(std::time(0));
     instanceId_ = toString(std::rand());
@@ -102,8 +126,11 @@ public:
     interestInterval_ = getDefaultInterestInterval();
     interestCount_ = getDefaultInterestCount();
     configurationFile_ = "";
-    ioService_ = ptr_lib::make_shared<boost::asio::io_service>();
-    face_ = Face(ioService_);
+    totalInterestSent_ = 0;
+    totalInterestReceived_ = 0;
+    minimumInterestRoundTripTime_ = std::numeric_limits<double>::max();
+    maximumInterestRoundTripTime_ = 0;
+    totalInterestRoundTripTime_ = 0;
   }
 
   NdnTrafficClient()
@@ -131,7 +158,18 @@ public:
       mustBeFresh = -1;
       nonceDuplicationPercentage = -1;
       scope = -1;
-      interestLifetime = -1;
+      interestLifetime = getDefaultInterestLifetime();
+      totalInterestSent = 0;
+      totalInterestReceived = 0;
+      minimumInterestRoundTripTime = std::numeric_limits<double>::max();
+      maximumInterestRoundTripTime = 0;
+      totalInterestRoundTripTime = 0;
+    }
+
+    int
+    getDefaultInterestLifetime()
+    {
+      return 4000;
     }
 
     void
@@ -171,7 +209,7 @@ public:
         detail += "InterestLifetime="+toString(interestLifetime)+", ";
       if (detail.length() >= 0)
         detail = detail.substr(0, detail.length()-2);
-      logger.log(detail);
+      logger.log(detail, false, false);
     }
 
     bool
@@ -237,11 +275,11 @@ public:
         else if (parameter == "InterestLifetime")
           interestLifetime = toInteger(value);
         else
-          logger.log("Line "+toString(lineNumber)+" \t- Invalid Parameter='"+parameter+"'");
+          logger.log("Line "+toString(lineNumber)+" \t- Invalid Parameter='"+parameter+"'", false, true);
       }
       else
       {
-        logger.log("Line "+toString(lineNumber)+" \t: Improper Traffic Configuration Line- "+detail);
+        logger.log("Line "+toString(lineNumber)+" \t- Improper Traffic Configuration Line- "+detail, false, true);
         return false;
       }
       return true;
@@ -268,6 +306,11 @@ public:
     int nonceDuplicationPercentage;
     int scope;
     int interestLifetime;
+    int totalInterestSent;
+    int totalInterestReceived;
+    double minimumInterestRoundTripTime;
+    double maximumInterestRoundTripTime;
+    double totalInterestRoundTripTime;
 
   };
 
@@ -353,7 +396,7 @@ public:
     bool skipLine;
     std::string patternLine;
     std::ifstream patternFile;
-    logger_.log("Analyzing Traffic Configuration File: " + configurationFile_);
+    logger_.log("Analyzing Traffic Configuration File: " + configurationFile_, true, true);
     patternFile.open(configurationFile_.c_str());
     if (patternFile.is_open())
     {
@@ -392,9 +435,8 @@ public:
       patternFile.close();
       if (!checkTrafficPatternCorrectness())
       {
-        logger_.log("ERROR - Traffic Configuration Provided Is Not Proper- " + configurationFile_);
+        logger_.log("ERROR - Traffic Configuration Provided Is Not Proper- " + configurationFile_, false, true);
         logger_.shutdownLogger();
-        std::cout << "ERROR - Check Log File For Details." << std::endl;
         exit(1);
       }
       for (patternId = 0; patternId < trafficPattern_.size(); patternId++)
@@ -402,9 +444,8 @@ public:
     }
     else
     {
-      logger_.log("ERROR - Unable To Open Traffic Configuration File: " + configurationFile_);
+      logger_.log("ERROR - Unable To Open Traffic Configuration File: " + configurationFile_, false, true);
       logger_.shutdownLogger();
-      std::cout << "ERROR - Check Log File For Details." << std::endl;
       exit(1);
     }
   }
@@ -420,18 +461,242 @@ public:
       }
       else
       {
-        logger_.log("ERROR - Traffic Configuration File Is Not A Regular File: " + configurationFile_);
+        logger_.log("ERROR - Traffic Configuration File Is Not A Regular File: " + configurationFile_, false, true);
         logger_.shutdownLogger();
-        std::cout << "ERROR - Check Log File For Details." << std::endl;
         exit(1);
       }
     }
     else
     {
-      logger_.log("ERROR - Traffic Configuration File Does Not Exist: " + configurationFile_);
+      logger_.log("ERROR - Traffic Configuration File Does Not Exist: " + configurationFile_, false, true);
       logger_.shutdownLogger();
-      std::cout << "ERROR - Check Log File For Details." << std::endl;
       exit(1);
+    }
+  }
+
+  int
+  getOldNonce()
+  {
+    int randomNonceKey;
+    if (nonceList_.size() == 0)
+      return getNewNonce();
+    std::srand(std::time(0));
+    randomNonceKey = std::rand() % nonceList_.size();
+    return nonceList_[randomNonceKey];
+  }
+
+  int
+  getNewNonce()
+  {
+    int randomNonceKey, i;
+    bool isOld;
+    isOld = true;
+    std::srand(std::time(0));
+    do
+    {
+      randomNonceKey = std::rand();
+      isOld = false;
+      for (i=0; i<nonceList_.size(); i++)
+        if (nonceList_[i] == randomNonceKey)
+          isOld = true;
+    } while(isOld);
+    nonceList_.push_back(randomNonceKey);
+    return randomNonceKey;
+  }
+
+  static std::string
+  getRandomByteString( int randomSize )
+  {
+    int i;
+    std::string characterSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw0123456789";
+    std::string randomData;
+    for (i=0; i<randomSize; i++)
+      randomData += characterSet[std::rand() % characterSet.length()];
+    return randomData;
+  }
+
+  void
+  onData( ndn::Face &face,
+          const ndn::Interest& interest,
+          ndn::Data& data,
+          int globalReference,
+          int localReference,
+          int patternId,
+          boost::posix_time::ptime sentTime )
+  {
+    double roundTripTime;
+    std::string logLine;
+    logLine = "";
+    logLine += "Data Received      - GlobalID="+toString(globalReference);
+    logLine += ", LocalID="+toString(localReference);
+    logLine += ", PatternID="+toString(patternId);
+    logLine += ", Name="+interest.getName().toUri();
+    logger_.log(logLine, true, false);
+    boost::posix_time::time_duration roundTripDuration;
+    totalInterestReceived_++;
+    trafficPattern_[patternId].totalInterestReceived++;
+    roundTripDuration = boost::posix_time::microsec_clock::local_time() - sentTime;
+    roundTripTime = roundTripDuration.total_microseconds()/1000.0;
+    if (minimumInterestRoundTripTime_ > roundTripTime)
+      minimumInterestRoundTripTime_ = roundTripTime;
+    if (maximumInterestRoundTripTime_ < roundTripTime)
+      maximumInterestRoundTripTime_ = roundTripTime;
+    if (trafficPattern_[patternId].minimumInterestRoundTripTime > roundTripTime)
+      trafficPattern_[patternId].minimumInterestRoundTripTime = roundTripTime;
+    if (trafficPattern_[patternId].maximumInterestRoundTripTime < roundTripTime)
+      trafficPattern_[patternId].maximumInterestRoundTripTime = roundTripTime;
+    totalInterestRoundTripTime_ += roundTripTime;
+    trafficPattern_[patternId].totalInterestRoundTripTime += roundTripTime;
+  }
+
+  void
+  onTimeout( ndn::Face &face,
+             const ndn::Interest& interest,
+             int globalReference,
+             int localReference,
+             int patternId)
+  {
+    std::string logLine;
+    logLine = "";
+    logLine += "Interest Timed Out - GlobalID="+toString(globalReference);
+    logLine += ", LocalID="+toString(localReference);
+    logLine += ", PatternID="+toString(patternId);
+    logLine += ", Name="+interest.getName().toUri();
+    logger_.log(logLine, true, false);
+  }
+
+  void
+  generateTraffic( const boost::system::error_code& errorCode,
+                   boost::asio::deadline_timer* deadlineTimer )
+  {
+    if ((interestCount_ < 0) || (totalInterestSent_ < interestCount_))
+    {
+      int trafficKey, patternId, cumulativePercentage;
+      std::srand(std::time(0));
+      trafficKey = std::rand() % 100;
+      cumulativePercentage = 0;
+      std::cout << trafficKey << std::endl;
+      for (patternId=0; patternId<trafficPattern_.size(); patternId++)
+      {
+        cumulativePercentage += trafficPattern_[patternId].trafficPercentage;
+        if (trafficKey <= cumulativePercentage)
+        {
+          Name interestName(trafficPattern_[patternId].name);
+          if (trafficPattern_[patternId].nameAppendBytes > 0)
+            interestName.append(getRandomByteString(trafficPattern_[patternId].nameAppendBytes));
+          if (trafficPattern_[patternId].nameAppendSequenceNumber >= 0)
+          {
+            interestName.append(toString(trafficPattern_[patternId].nameAppendSequenceNumber));
+            trafficPattern_[patternId].nameAppendSequenceNumber++;
+          }
+          Interest interest(interestName);
+          if (trafficPattern_[patternId].minSuffixComponents > 0)
+            interest.setMinSuffixComponents(trafficPattern_[patternId].minSuffixComponents);
+          if (trafficPattern_[patternId].maxSuffixComponents > 0)
+            interest.setMaxSuffixComponents(trafficPattern_[patternId].maxSuffixComponents);
+          Exclude exclude;
+          if (trafficPattern_[patternId].excludeBefore != "" &&  trafficPattern_[patternId].excludeAfter != "")
+          {
+            exclude.excludeRange(name::Component(trafficPattern_[patternId].excludeAfter),
+                                 name::Component(trafficPattern_[patternId].excludeBefore));
+            interest.setExclude(exclude);
+          }
+          else if (trafficPattern_[patternId].excludeBefore != "")
+          {
+            exclude.excludeBefore(name::Component(trafficPattern_[patternId].excludeBefore));
+            interest.setExclude(exclude);
+          }
+          else if (trafficPattern_[patternId].excludeAfter != "")
+          {
+            exclude.excludeAfter(name::Component(trafficPattern_[patternId].excludeAfter));
+            interest.setExclude(exclude);
+          }
+          if (trafficPattern_[patternId].excludeBeforeBytes > 0 &&  trafficPattern_[patternId].excludeAfterBytes > 0)
+          {
+            exclude.excludeRange(name::Component(getRandomByteString(trafficPattern_[patternId].excludeAfterBytes)),
+                                 name::Component(getRandomByteString(trafficPattern_[patternId].excludeBeforeBytes)));
+            interest.setExclude(exclude);
+          }
+          else if (trafficPattern_[patternId].excludeBeforeBytes > 0)
+          {
+            exclude.excludeBefore(name::Component(getRandomByteString(trafficPattern_[patternId].excludeBeforeBytes)));
+            interest.setExclude(exclude);
+          }
+          else if (trafficPattern_[patternId].excludeAfterBytes > 0)
+          {
+            exclude.excludeAfter(name::Component(getRandomByteString(trafficPattern_[patternId].excludeAfterBytes)));
+            interest.setExclude(exclude);
+          }
+
+          if (trafficPattern_[patternId].childSelector >= 0)
+            interest.setChildSelector(trafficPattern_[patternId].childSelector);
+
+          if (trafficPattern_[patternId].mustBeFresh == 0)
+            interest.setMustBeFresh(false);
+          else if (trafficPattern_[patternId].mustBeFresh == 1)
+            interest.setMustBeFresh(true);
+          if (trafficPattern_[patternId].nonceDuplicationPercentage > 0)
+          {
+            int duplicationKey;
+            std::srand(std::time(0));
+            duplicationKey = std::rand() % 100;
+            if (trafficPattern_[patternId].nonceDuplicationPercentage <= duplicationKey)
+              interest.setNonce(getOldNonce());
+            else
+              interest.setNonce(getNewNonce());
+          }
+          else
+            interest.setNonce(getNewNonce());
+          if (trafficPattern_[patternId].scope >= 0)
+            interest.setScope(trafficPattern_[patternId].scope);
+          if (trafficPattern_[patternId].interestLifetime > 0)
+            interest.setInterestLifetime(trafficPattern_[patternId].interestLifetime);
+          try {
+            totalInterestSent_++;
+            trafficPattern_[patternId].totalInterestSent++;
+            boost::posix_time::ptime sentTime;
+            sentTime = boost::posix_time::microsec_clock::local_time();
+            face_.expressInterest(interest,
+                                  func_lib::bind( &NdnTrafficClient::onData,
+                                                  this, boost::ref(face_),
+                                                  _1, _2, totalInterestSent_,
+                                                  trafficPattern_[patternId].totalInterestSent,
+                                                  patternId,
+                                                  sentTime),
+                                  func_lib::bind( &NdnTrafficClient::onTimeout,
+                                                  this, boost::ref(face_),
+                                                  _1, totalInterestSent_,
+                                                  trafficPattern_[patternId].totalInterestSent,
+                                                  patternId));
+            std::string logLine;
+            logLine = "";
+            logLine += "Sending Interest   - GlobalID="+toString(totalInterestSent_);
+            logLine += ", LocalID="+toString(trafficPattern_[patternId].totalInterestSent);
+            logLine += ", PatternID="+toString(patternId);
+            logLine += ", Name="+interest.getName().toUri();
+            logger_.log(logLine, true, false);
+            deadlineTimer->expires_at(deadlineTimer->expires_at() +
+                                      boost::posix_time::millisec(interestInterval_));
+            deadlineTimer->async_wait(boost::bind(&NdnTrafficClient::generateTraffic,
+                                                  this,
+                                                  boost::asio::placeholders::error,
+                                                  deadlineTimer));
+          }
+          catch (std::exception &e) {
+            logger_.log("ERROR: "+(std::string)e.what(), true, true);
+          }
+          break;
+        }
+      }
+      if (patternId==trafficPattern_.size())
+      {
+        deadlineTimer->expires_at(deadlineTimer->expires_at() +
+                                  boost::posix_time::millisec(interestInterval_));
+        deadlineTimer->async_wait(boost::bind(&NdnTrafficClient::generateTraffic,
+                                              this,
+                                              boost::asio::placeholders::error,
+                                              deadlineTimer));
+      }
     }
   }
 
@@ -442,6 +707,19 @@ public:
     signalSet.async_wait(boost::bind(&NdnTrafficClient::signalHandler, this));
     logger_.initializeLog(instanceId_);
     initializeTrafficConfiguration();
+    boost::asio::deadline_timer deadlineTimer(*ioService_,
+                                              boost::posix_time::millisec(interestInterval_));
+    deadlineTimer.async_wait(boost::bind(&NdnTrafficClient::generateTraffic,
+                                         this,
+                                         boost::asio::placeholders::error,
+                                         &deadlineTimer));
+    try {
+      face_.processEvents();
+    }
+    catch(std::exception &e) {
+      logger_.log("ERROR: "+(std::string)e.what(), true, true);
+      logger_.shutdownLogger();
+    }
   }
 
 private:
@@ -454,8 +732,14 @@ private:
   Logger logger_;
   std::string configurationFile_;
   ptr_lib::shared_ptr<boost::asio::io_service> ioService_;
-  std::vector<InterestTrafficConfiguration> trafficPattern_;
   Face face_;
+  std::vector<InterestTrafficConfiguration> trafficPattern_;
+  std::vector<int> nonceList_;
+  int totalInterestSent_;
+  int totalInterestReceived_;
+  double minimumInterestRoundTripTime_;
+  double maximumInterestRoundTripTime_;
+  double totalInterestRoundTripTime_;
 
 };
 
