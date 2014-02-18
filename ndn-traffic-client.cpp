@@ -10,8 +10,8 @@
 #include <fstream>
 #include <vector>
 #include <boost/asio.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/bind.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <ndn-cpp-dev/face.hpp>
@@ -34,7 +34,10 @@ public:
   shutdownLogger()
   {
     if (logFile_.is_open())
+    {
+      log("Terminating Logging Operations" , true, true);
       logFile_.close();
+    }
   }
 
   static std::string
@@ -118,7 +121,7 @@ class NdnTrafficClient
 {
 public:
 
-  NdnTrafficClient( char* programName ) : ioService_(new boost::asio::io_service), face_(ioService_)
+  NdnTrafficClient( char* programName ) : ioService_(new boost::asio::io_service), face_(ioService_), keyChain_()
   {
     std::srand(std::time(0));
     instanceId_ = toString(std::rand());
@@ -131,11 +134,6 @@ public:
     minimumInterestRoundTripTime_ = std::numeric_limits<double>::max();
     maximumInterestRoundTripTime_ = 0;
     totalInterestRoundTripTime_ = 0;
-  }
-
-  NdnTrafficClient()
-  : keyChain_()
-  {
   }
 
   class InterestTrafficConfiguration
@@ -158,18 +156,12 @@ public:
       mustBeFresh = -1;
       nonceDuplicationPercentage = -1;
       scope = -1;
-      interestLifetime = getDefaultInterestLifetime();
+      interestLifetime = -1;
       totalInterestSent = 0;
       totalInterestReceived = 0;
       minimumInterestRoundTripTime = std::numeric_limits<double>::max();
       maximumInterestRoundTripTime = 0;
       totalInterestRoundTripTime = 0;
-    }
-
-    int
-    getDefaultInterestLifetime()
-    {
-      return 4000;
     }
 
     void
@@ -181,13 +173,13 @@ public:
         detail += "TrafficPercentage="+toString(trafficPercentage)+", ";
       if (name != "")
         detail += "Name="+name+", ";
-      if (nameAppendBytes>0)
+      if (nameAppendBytes > 0)
         detail += "NameAppendBytes="+toString(nameAppendBytes)+", ";
-      if (nameAppendSequenceNumber>0)
+      if (nameAppendSequenceNumber > 0)
         detail += "NameAppendSequenceNumber="+toString(nameAppendSequenceNumber)+", ";
-      if (minSuffixComponents>0)
+      if (minSuffixComponents >= 0)
         detail += "MinSuffixComponents="+toString(minSuffixComponents)+", ";
-      if (maxSuffixComponents>0)
+      if (maxSuffixComponents >= 0)
         detail += "MaxSuffixComponents="+toString(maxSuffixComponents)+", ";
       if (excludeBefore != "")
         detail += "ExcludeBefore="+excludeBefore+", ";
@@ -197,15 +189,15 @@ public:
         detail += "ExcludeBeforeBytes="+toString(excludeBeforeBytes)+", ";
       if (excludeAfterBytes > 0)
         detail += "ExcludeAfterBytes="+toString(excludeAfterBytes)+", ";
-      if (childSelector > 0)
+      if (childSelector >= 0)
         detail += "ChildSelector="+toString(childSelector)+", ";
-      if (mustBeFresh > 0)
+      if (mustBeFresh >= 0)
         detail += "MustBeFresh="+toString(mustBeFresh)+", ";
       if (nonceDuplicationPercentage > 0)
         detail += "NonceDuplicationPercentage="+toString(nonceDuplicationPercentage)+", ";
-      if (scope > 0)
+      if (scope >= 0)
         detail += "Scope="+toString(scope)+", ";
-      if (interestLifetime > 0)
+      if (interestLifetime >= 0)
         detail += "InterestLifetime="+toString(interestLifetime)+", ";
       if (detail.length() >= 0)
         detail = detail.substr(0, detail.length()-2);
@@ -314,11 +306,25 @@ public:
 
   };
 
+  int
+  getDefaultInterestLifetime()
+  {
+    return 4000;
+  }
+
   static std::string
   toString( int integerValue )
   {
     std::stringstream stream;
     stream << integerValue;
+    return stream.str();
+  }
+
+  static std::string
+  toString( double doubleValue )
+  {
+    std::stringstream stream;
+    stream << doubleValue;
     return stream.str();
   }
 
@@ -379,7 +385,54 @@ public:
     logger_.shutdownLogger();
     face_.shutdown();
     ioService_.reset();
+    logStatistics();
     exit(1);
+  }
+
+  void
+  logStatistics()
+  {
+    int patternId;
+    double loss, average;
+
+    logger_.log("\n\n== Interest Traffic Report ==\n", false, true);
+    logger_.log("Total Traffic Pattern Types = "+toString((int)trafficPattern_.size()), false, true);
+    logger_.log("Total Interests Sent        = "+toString(totalInterestSent_), false, true);
+    logger_.log("Total Responses Received    = "+toString(totalInterestReceived_), false, true);
+    if (totalInterestSent_ > 0)
+      loss = (totalInterestSent_-totalInterestReceived_)*100.0/totalInterestSent_;
+    else
+      loss = 0;
+    logger_.log("Total Interest Loss         = "+toString(loss)+"%", false, true);
+    if (totalInterestReceived_ > 0)
+      average = totalInterestRoundTripTime_/totalInterestReceived_;
+    else
+      average = 0;
+    logger_.log("Total Round Trip Time       = "+toString(totalInterestRoundTripTime_)+"ms", false, true);
+    logger_.log("Average Round Trip Time     = "+toString(average)+"ms\n", false, true);
+
+    for (patternId=0; patternId<trafficPattern_.size(); patternId++)
+    {
+      logger_.log("Traffic Pattern Type #"+toString(patternId+1), false, true);
+      trafficPattern_[patternId].printTrafficConfiguration(logger_);
+      logger_.log("Total Interests Sent        = "+toString(trafficPattern_[patternId].totalInterestSent), false, true);
+      logger_.log("Total Responses Received    = "+toString(trafficPattern_[patternId].totalInterestReceived), false, true);
+      if (trafficPattern_[patternId].totalInterestSent > 0)
+      {
+        loss = (trafficPattern_[patternId].totalInterestSent-trafficPattern_[patternId].totalInterestReceived);
+        loss *= 100.0;
+        loss /= trafficPattern_[patternId].totalInterestSent;
+      }
+      else
+        loss = 0;
+      logger_.log("Total Interest Loss         = "+toString(loss)+"%", false, true);
+      if (trafficPattern_[patternId].totalInterestReceived > 0)
+        average = trafficPattern_[patternId].totalInterestRoundTripTime/trafficPattern_[patternId].totalInterestReceived;
+      else
+        average = 0;
+      logger_.log("Total Round Trip Time       = "+toString(trafficPattern_[patternId].totalInterestRoundTripTime)+"ms", false, true);
+      logger_.log("Average Round Trip Time     = "+toString(average)+"ms\n", false, true);
+    }
   }
 
   bool
@@ -439,8 +492,13 @@ public:
         logger_.shutdownLogger();
         exit(1);
       }
-      for (patternId = 0; patternId < trafficPattern_.size(); patternId++)
+      logger_.log("Traffic Configuration File Processing Completed\n", true, false);
+      for (patternId=0; patternId<trafficPattern_.size(); patternId++)
+      {
+        logger_.log("Traffic Pattern Type #"+toString(patternId+1), false, false);
         trafficPattern_[patternId].printTrafficConfiguration(logger_);
+        logger_.log("", false, false);
+      }
     }
     else
     {
@@ -547,6 +605,8 @@ public:
       trafficPattern_[patternId].maximumInterestRoundTripTime = roundTripTime;
     totalInterestRoundTripTime_ += roundTripTime;
     trafficPattern_[patternId].totalInterestRoundTripTime += roundTripTime;
+    if (totalInterestSent_ == interestCount_)
+      signalHandler();
   }
 
   void
@@ -563,6 +623,8 @@ public:
     logLine += ", PatternID="+toString(patternId);
     logLine += ", Name="+interest.getName().toUri();
     logger_.log(logLine, true, false);
+    if (totalInterestSent_ == interestCount_)
+      signalHandler();
   }
 
   void
@@ -575,7 +637,6 @@ public:
       std::srand(std::time(0));
       trafficKey = std::rand() % 100;
       cumulativePercentage = 0;
-      std::cout << trafficKey << std::endl;
       for (patternId=0; patternId<trafficPattern_.size(); patternId++)
       {
         cumulativePercentage += trafficPattern_[patternId].trafficPercentage;
@@ -590,9 +651,9 @@ public:
             trafficPattern_[patternId].nameAppendSequenceNumber++;
           }
           Interest interest(interestName);
-          if (trafficPattern_[patternId].minSuffixComponents > 0)
+          if (trafficPattern_[patternId].minSuffixComponents >= 0)
             interest.setMinSuffixComponents(trafficPattern_[patternId].minSuffixComponents);
-          if (trafficPattern_[patternId].maxSuffixComponents > 0)
+          if (trafficPattern_[patternId].maxSuffixComponents >= 0)
             interest.setMaxSuffixComponents(trafficPattern_[patternId].maxSuffixComponents);
           Exclude exclude;
           if (trafficPattern_[patternId].excludeBefore != "" &&  trafficPattern_[patternId].excludeAfter != "")
@@ -633,7 +694,7 @@ public:
 
           if (trafficPattern_[patternId].mustBeFresh == 0)
             interest.setMustBeFresh(false);
-          else if (trafficPattern_[patternId].mustBeFresh == 1)
+          else if (trafficPattern_[patternId].mustBeFresh > 0)
             interest.setMustBeFresh(true);
           if (trafficPattern_[patternId].nonceDuplicationPercentage > 0)
           {
@@ -649,8 +710,10 @@ public:
             interest.setNonce(getNewNonce());
           if (trafficPattern_[patternId].scope >= 0)
             interest.setScope(trafficPattern_[patternId].scope);
-          if (trafficPattern_[patternId].interestLifetime > 0)
+          if (trafficPattern_[patternId].interestLifetime >= 0)
             interest.setInterestLifetime(trafficPattern_[patternId].interestLifetime);
+          else
+            interest.setInterestLifetime(getDefaultInterestLifetime());
           try {
             totalInterestSent_++;
             trafficPattern_[patternId].totalInterestSent++;
