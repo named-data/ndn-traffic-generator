@@ -585,9 +585,9 @@ public:
     double roundTripTime;
     std::string logLine;
     logLine = "";
-    logLine += "Data Received      - GlobalID="+toString(globalReference);
+    logLine += "Data Received      - PatternType="+toString(patternId+1);
+    logLine += ", GlobalID="+toString(globalReference);
     logLine += ", LocalID="+toString(localReference);
-    logLine += ", PatternID="+toString(patternId);
     logLine += ", Name="+interest.getName().toUri();
     logger_.log(logLine, true, false);
     boost::posix_time::time_duration roundTripDuration;
@@ -618,9 +618,9 @@ public:
   {
     std::string logLine;
     logLine = "";
-    logLine += "Interest Timed Out - GlobalID="+toString(globalReference);
+    logLine += "Interest Timed Out - PatternType="+toString(patternId+1);
+    logLine += ", GlobalID="+toString(globalReference);
     logLine += ", LocalID="+toString(localReference);
-    logLine += ", PatternID="+toString(patternId);
     logLine += ", Name="+interest.getName().toUri();
     logger_.log(logLine, true, false);
     if (totalInterestSent_ == interestCount_)
@@ -733,9 +733,9 @@ public:
                                                   patternId));
             std::string logLine;
             logLine = "";
-            logLine += "Sending Interest   - GlobalID="+toString(totalInterestSent_);
+            logLine += "Sending Interest   - PatternType="+toString(patternId+1);
+            logLine += ", GlobalID="+toString(totalInterestSent_);
             logLine += ", LocalID="+toString(trafficPattern_[patternId].totalInterestSent);
-            logLine += ", PatternID="+toString(patternId);
             logLine += ", Name="+interest.getName().toUri();
             logger_.log(logLine, true, false);
             deadlineTimer->expires_at(deadlineTimer->expires_at() +

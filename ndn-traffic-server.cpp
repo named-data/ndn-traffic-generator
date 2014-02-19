@@ -432,7 +432,7 @@ public:
     keyChain_.sign(data);
     totalInterestReceived_++;
     trafficPattern_[patternId].totalInterestReceived++;
-    logLine += "Interest Received          - PatternID="+toString(patternId);
+    logLine += "Interest Received          - PatternType="+toString(patternId+1);
     logLine += ", GlobalID="+toString(totalInterestReceived_);
     logLine += ", LocalID="+toString(trafficPattern_[patternId].totalInterestReceived);
     logLine += ", Name="+trafficPattern_[patternId].name;
@@ -445,7 +445,7 @@ public:
   {
     std::string logLine;
     logLine = "";
-    logLine += "Prefix Registration Failed - PatternID="+toString(patternId);
+    logLine += "Prefix Registration Failed - PatternType="+toString(patternId+1);
     logLine += ", Name="+trafficPattern_[patternId].name;
     logger_.log(logLine, true, true);
     totalRegistrationsFailed_++;
