@@ -255,9 +255,16 @@ public:
   void
   usage()
   {
-    std::cout << "\nUsage: " << programName_ << " Printing Usage"
-      "\n\n";
+
+    std::cout << "\nUsage: " << programName_ << " [options] <Traffic_Configuration_File>\n"
+        "Respond to Interest as per provided Traffic Configuration File\n"
+        "Multiple Prefixes can be configured for handling.\n"
+        "Set environment variable NDN_TRAFFIC_LOGFOLDER for redirecting output to a log.\n"
+        "  [-d interval] - set delay before responding to interest in milliseconds (minimum "
+        << getDefaultContentDelayTime() << " milliseconds)\n"
+        "  [-h] - print help and exit\n\n";
     exit(1);
+
   }
 
   int
@@ -419,6 +426,7 @@ public:
     std::string content, logLine;
     content = "";
     logLine = "";
+
     Data data(interest.getName());
     if (trafficPattern_[patternId].contentType >= 0)
       data.setContentType(trafficPattern_[patternId].contentType);
@@ -437,6 +445,7 @@ public:
     logLine += ", LocalID="+toString(trafficPattern_[patternId].totalInterestReceived);
     logLine += ", Name="+trafficPattern_[patternId].name;
     logger_.log(logLine, true, false);
+    usleep(contentDelayTime_*1000);
     face_.put(data);
   }
 

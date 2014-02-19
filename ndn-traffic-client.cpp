@@ -340,9 +340,17 @@ public:
   void
   usage()
   {
-    std::cout << "\nUsage: " << programName_ << " Printing Usage"
-              << std::endl << std::endl;
+
+    std::cout << "\nUsage: " << programName_ << " [options] <Traffic_Configuration_File>\n"
+        "Generate Interest Traffic as per provided Traffic Configuration File\n"
+        "Interests are continuously generated unless a total number is specified.\n"
+        "Set environment variable NDN_TRAFFIC_LOGFOLDER for redirecting output to a log.\n"
+        "  [-i interval] - set interest generation interval in milliseconds (minimum "
+        << getDefaultInterestInterval() << " milliseconds)\n"
+        "  [-c count] - set total number of interests to be generated\n"
+        "  [-h] - print help and exit\n\n";
     exit(1);
+
   }
 
   int
