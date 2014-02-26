@@ -1,8 +1,10 @@
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil -*- */
 /**
- *
  * Copyright (C) 2014 University of Arizona.
- * @author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  *
+ * GNU 3.0 License, see the LICENSE file for more information
+ *
+ * Author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  */
 
 #include <sstream>
@@ -12,110 +14,19 @@
 #include <ndn-cpp-dev/face.hpp>
 #include <ndn-cpp-dev/security/key-chain.hpp>
 
-using namespace ndn;
+#include "logger.hpp"
 
-class Logger
-{
-public:
-
-  Logger()
-  {
-    logLocation_ = "";
-  }
-
-  void
-  shutdownLogger()
-  {
-    if (logFile_.is_open())
-    {
-      log("Terminating Logging Operations" , true, true);
-      logFile_.close();
-    }
-  }
-
-  static std::string
-  getTimestamp()
-  {
-    boost::posix_time::ptime now;
-    now = boost::posix_time::second_clock::local_time();
-    return to_simple_string(now);
-  }
-
-  void
-  log( std::string logLine, bool printTime, bool printToConsole )
-  {
-    if( logLocation_.length() > 0 )
-    {
-      if (printTime)
-        logFile_ << getTimestamp() << " - ";
-      logFile_ << logLine << std::endl;
-      logFile_.flush();
-      if (printToConsole)
-      {
-        if (printTime)
-          std::cout << getTimestamp() << " - ";
-        std::cout << logLine << std::endl;
-      }
-    }
-    else
-    {
-      if (printTime)
-        std::cout << getTimestamp() << " - ";
-      std::cout << logLine << std::endl;
-    }
-  }
-
-  void
-  initializeLog( std::string instanceId )
-  {
-    char* variableValue = std::getenv("NDN_TRAFFIC_LOGFOLDER");
-    std::string logFilename;
-    logLocation_ = "";
-    if (variableValue != NULL)
-      logLocation_ = variableValue;
-    if (boost::filesystem::exists(boost::filesystem::path(logLocation_)))
-    {
-      if (boost::filesystem::is_directory(boost::filesystem::path(logLocation_)))
-      {
-        logFilename = logLocation_+"/NDNTrafficServer_"+instanceId+".log";
-        logFile_.open(logFilename.c_str(), std::ofstream::out | std::ofstream::trunc);
-        if (logFile_.is_open())
-          std::cout << "Log File Initialized: " << logFilename << std::endl;
-        else
-        {
-          std::cout << "ERROR - Unable To Initialize A Log File At: " << logLocation_ << std::endl
-                    << "Using Default Output For Logging." << std::endl;
-          logLocation_ = "";
-        }
-      }
-      else
-      {
-        std::cout << "Environment Variable NDN_TRAFFIC_LOGFOLDER Should Be A Folder." << std::endl
-                  << "Using Default Output For Logging." << std::endl;
-        logLocation_ = "";
-      }
-    }
-    else
-    {
-      std::cout << "Environment Variable NDN_TRAFFIC_LOGFOLDER Not Set." << std::endl
-                << "Using Default Output For Logging." << std::endl;
-      logLocation_ = "";
-    }
-  }
-
-private:
-
-  std::string logLocation_;
-  std::ofstream logFile_;
-
-};
-
+namespace ndn {
 
 class NdnTrafficServer
 {
 public:
-
-  NdnTrafficServer( char* programName ) : ioService_(new boost::asio::io_service), face_(ioService_), keyChain_()
+  
+  NdnTrafficServer( char* programName )
+    : m_logger("NDNTrafficServer")
+    , ioService_(new boost::asio::io_service)
+    , face_(ioService_)
+    , keyChain_()
   {
     std::srand(std::time(0));
     instanceId_ = toString(std::rand());
@@ -155,7 +66,7 @@ public:
         detail += "ContentBytes="+toString(contentBytes)+", ";
       if (content != "")
         detail += "Content="+content+", ";
-      if (detail.length() >= 0)
+      if (detail.length() >= 2)
         detail = detail.substr(0, detail.length()-2);
       logger.log(detail, false, false);
     }
@@ -170,18 +81,18 @@ public:
       value = "";
       i = 0;
       while (detail[i] != '=' && i < detail.length())
-      {
-        parameter += detail[i];
-        i++;
-      }
+        {
+          parameter += detail[i];
+          i++;
+        }
       if (i == detail.length())
         return false;
       i++;
       while ((std::isalnum(detail[i]) || allowedCharacters.find(detail[i]) != std::string::npos) && i < detail.length())
-      {
-        value += detail[i];
-        i++;
-      }
+        {
+          value += detail[i];
+          i++;
+        }
       if(parameter == "" || value == "")
         return false;
       return true;
@@ -192,25 +103,25 @@ public:
     {
       std::string parameter, value;
       if (extractParameterValue(detail, parameter, value))
-      {
-        if (parameter == "Name")
-          name = value;
-        else if (parameter == "ContentType")
-          contentType = toInteger(value);
-        else if (parameter == "FreshnessPeriod")
-          freshnessPeriod = toInteger(value);
-        else if (parameter == "ContentBytes")
-          contentBytes = toInteger(value);
-        else if (parameter == "Content")
-          content = value;
-        else
-          logger.log("Line "+toString(lineNumber)+" \t- Invalid Parameter='"+parameter+"'", false, true);
-      }
+        {
+          if (parameter == "Name")
+            name = value;
+          else if (parameter == "ContentType")
+            contentType = toInteger(value);
+          else if (parameter == "FreshnessPeriod")
+            freshnessPeriod = toInteger(value);
+          else if (parameter == "ContentBytes")
+            contentBytes = toInteger(value);
+          else if (parameter == "Content")
+            content = value;
+          else
+            logger.log("Line "+toString(lineNumber)+" \t- Invalid Parameter='"+parameter+"'", false, true);
+        }
       else
-      {
-        logger.log("Line "+toString(lineNumber)+" \t- Improper Traffic Configuration Line- "+detail, false, true);
-        return false;
-      }
+        {
+          logger.log("Line "+toString(lineNumber)+" \t- Improper Traffic Configuration Line- "+detail, false, true);
+          return false;
+        }
       return true;
     }
 
@@ -257,12 +168,12 @@ public:
   {
 
     std::cout << "\nUsage: " << programName_ << " [options] <Traffic_Configuration_File>\n"
-        "Respond to Interest as per provided Traffic Configuration File\n"
-        "Multiple Prefixes can be configured for handling.\n"
-        "Set environment variable NDN_TRAFFIC_LOGFOLDER for redirecting output to a log.\n"
-        "  [-d interval] - set delay before responding to interest in milliseconds (minimum "
-        << getDefaultContentDelayTime() << " milliseconds)\n"
-        "  [-h] - print help and exit\n\n";
+      "Respond to Interest as per provided Traffic Configuration File\n"
+      "Multiple Prefixes can be configured for handling.\n"
+      "Set environment variable NDN_TRAFFIC_LOGFOLDER for redirecting output to a log.\n"
+      "  [-d interval] - set delay before responding to interest in milliseconds (minimum "
+              << getDefaultContentDelayTime() << " milliseconds)\n"
+      "  [-h] - print help and exit\n\n";
     exit(1);
 
   }
@@ -290,7 +201,7 @@ public:
   void
   signalHandler()
   {
-    logger_.shutdownLogger();
+    m_logger.shutdownLogger();
     face_.shutdown();
     ioService_.reset();
     logStatistics();
@@ -301,15 +212,15 @@ public:
   logStatistics()
   {
     int patternId;
-    logger_.log("\n\n== Interest Traffic Report ==\n", false, true);
-    logger_.log("Total Traffic Pattern Types = "+toString((int)trafficPattern_.size()), false, true);
-    logger_.log("Total Interests Received    = "+toString(totalInterestReceived_), false, true);
+    m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
+    m_logger.log("Total Traffic Pattern Types = "+toString((int)trafficPattern_.size()), false, true);
+    m_logger.log("Total Interests Received    = "+toString(totalInterestReceived_), false, true);
     for (patternId=0; patternId<trafficPattern_.size(); patternId++)
-    {
-      logger_.log("\nTraffic Pattern Type #"+toString(patternId+1), false, true);
-      trafficPattern_[patternId].printTrafficConfiguration(logger_);
-      logger_.log("Total Interests Received    = "+toString(trafficPattern_[patternId].totalInterestReceived)+"\n", false, true);
-    }
+      {
+        m_logger.log("\nTraffic Pattern Type #"+toString(patternId+1), false, true);
+        trafficPattern_[patternId].printTrafficConfiguration(m_logger);
+        m_logger.log("Total Interests Received    = "+toString(trafficPattern_[patternId].totalInterestReceived)+"\n", false, true);
+      }
   }
 
   bool
@@ -326,87 +237,87 @@ public:
     bool skipLine;
     std::string patternLine;
     std::ifstream patternFile;
-    logger_.log("Analyzing Traffic Configuration File: " + configurationFile_, true, true);
+    m_logger.log("Analyzing Traffic Configuration File: " + configurationFile_, true, true);
     patternFile.open(configurationFile_.c_str());
     if (patternFile.is_open())
-    {
-      patternId = 0;
-      lineNumber = 0;
-      while (getline(patternFile, patternLine))
       {
-        lineNumber++;
-        if (std::isalpha(patternLine[0]))
-        {
-          DataTrafficConfiguration dataData;
-          skipLine = false;
-          patternId++;
-          if (dataData.processConfigurationDetail(patternLine, logger_, lineNumber))
+        patternId = 0;
+        lineNumber = 0;
+        while (getline(patternFile, patternLine))
           {
-            while (getline(patternFile, patternLine) && std::isalpha(patternLine[0]))
-            {
-              lineNumber++;
-              if (!dataData.processConfigurationDetail(patternLine, logger_, lineNumber))
-              {
-                skipLine = true;
-                break;
-              }
-            }
             lineNumber++;
+            if (std::isalpha(patternLine[0]))
+              {
+                DataTrafficConfiguration dataData;
+                skipLine = false;
+                patternId++;
+                if (dataData.processConfigurationDetail(patternLine, m_logger, lineNumber))
+                  {
+                    while (getline(patternFile, patternLine) && std::isalpha(patternLine[0]))
+                      {
+                        lineNumber++;
+                        if (!dataData.processConfigurationDetail(patternLine, m_logger, lineNumber))
+                          {
+                            skipLine = true;
+                            break;
+                          }
+                      }
+                    lineNumber++;
+                  }
+                else
+                  skipLine = true;
+                if( !skipLine )
+                  {
+                    if (dataData.checkTrafficDetailCorrectness())
+                      trafficPattern_.push_back(dataData);
+                  }
+              }
           }
-          else
-            skipLine = true;
-          if( !skipLine )
+        patternFile.close();
+        if (!checkTrafficPatternCorrectness())
           {
-            if (dataData.checkTrafficDetailCorrectness())
-              trafficPattern_.push_back(dataData);
+            m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper- " + configurationFile_, false, true);
+            m_logger.shutdownLogger();
+            exit(1);
           }
-        }
+        m_logger.log("Traffic Configuration File Processing Completed\n", true, false);
+        for (patternId = 0; patternId < trafficPattern_.size(); patternId++)
+          {
+            m_logger.log("Traffic Pattern Type #"+toString(patternId+1), false, false);
+            trafficPattern_[patternId].printTrafficConfiguration(m_logger);
+            m_logger.log("", false, false);
+          }
       }
-      patternFile.close();
-      if (!checkTrafficPatternCorrectness())
+    else
       {
-        logger_.log("ERROR - Traffic Configuration Provided Is Not Proper- " + configurationFile_, false, true);
-        logger_.shutdownLogger();
+        m_logger.log("ERROR - Unable To Open Traffic Configuration File: " + configurationFile_, false, true);
+        m_logger.shutdownLogger();
         exit(1);
       }
-      logger_.log("Traffic Configuration File Processing Completed\n", true, false);
-      for (patternId = 0; patternId < trafficPattern_.size(); patternId++)
-      {
-        logger_.log("Traffic Pattern Type #"+toString(patternId+1), false, false);
-        trafficPattern_[patternId].printTrafficConfiguration(logger_);
-        logger_.log("", false, false);
-      }
-    }
-    else
-    {
-      logger_.log("ERROR - Unable To Open Traffic Configuration File: " + configurationFile_, false, true);
-      logger_.shutdownLogger();
-      exit(1);
-    }
   }
 
   void
   initializeTrafficConfiguration()
   {
     if (boost::filesystem::exists(boost::filesystem::path(configurationFile_)))
-    {
-      if(boost::filesystem::is_regular_file(boost::filesystem::path(configurationFile_)))
       {
-        analyzeConfigurationFile();
+        if(boost::filesystem::is_regular_file(boost::filesystem::path(configurationFile_)))
+          {
+            analyzeConfigurationFile();
+          }
+        else
+          {
+            m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " + configurationFile_, false, true);
+            m_logger.shutdownLogger();
+            exit(1);
+          }
       }
-      else
+    else
       {
-        logger_.log("ERROR - Traffic Configuration File Is Not A Regular File: " + configurationFile_, false, true);
-        logger_.shutdownLogger();
+        m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " + configurationFile_, false, true);
+        m_logger.shutdownLogger();
         exit(1);
       }
-    }
-    else
-    {
-      logger_.log("ERROR - Traffic Configuration File Does Not Exist: " + configurationFile_, false, true);
-      logger_.shutdownLogger();
-      exit(1);
-    }
   }
 
   static std::string
@@ -444,7 +355,7 @@ public:
     logLine += ", GlobalID="+toString(totalInterestReceived_);
     logLine += ", LocalID="+toString(trafficPattern_[patternId].totalInterestReceived);
     logLine += ", Name="+trafficPattern_[patternId].name;
-    logger_.log(logLine, true, false);
+    m_logger.log(logLine, true, false);
     usleep(contentDelayTime_*1000);
     face_.put(data);
   }
@@ -456,7 +367,7 @@ public:
     logLine = "";
     logLine += "Prefix Registration Failed - PatternType="+toString(patternId+1);
     logLine += ", Name="+trafficPattern_[patternId].name;
-    logger_.log(logLine, true, true);
+    m_logger.log(logLine, true, true);
     totalRegistrationsFailed_++;
     if (totalRegistrationsFailed_ == trafficPattern_.size())
       signalHandler();
@@ -467,27 +378,27 @@ public:
   {
     boost::asio::signal_set signalSet(*ioService_, SIGINT, SIGTERM);
     signalSet.async_wait(boost::bind(&NdnTrafficServer::signalHandler, this));
-    logger_.initializeLog(instanceId_);
+    m_logger.initializeLog(instanceId_);
     initializeTrafficConfiguration();
 
     int patternId;
     for (patternId=0; patternId<trafficPattern_.size(); patternId++ )
-    {
-      face_.setInterestFilter(  trafficPattern_[patternId].name,
-                                func_lib::bind( &NdnTrafficServer::onInterest,
-                                                this, _1, _2,
-                                                patternId),
-                                func_lib::bind( &NdnTrafficServer::onRegisterFailed,
-                                                this, _1, _2,
-                                                patternId));
-    }
+      {
+        face_.setInterestFilter(  trafficPattern_[patternId].name,
+                                  func_lib::bind( &NdnTrafficServer::onInterest,
+                                                  this, _1, _2,
+                                                  patternId),
+                                  func_lib::bind( &NdnTrafficServer::onRegisterFailed,
+                                                  this, _1, _2,
+                                                  patternId));
+      }
 
     try {
       face_.processEvents();
     }
     catch(std::exception &e) {
-      logger_.log("ERROR: "+(std::string)e.what(), true, true);
-      logger_.shutdownLogger();
+      m_logger.log("ERROR: "+(std::string)e.what(), true, true);
+      m_logger.shutdownLogger();
     }
   }
 
@@ -498,7 +409,7 @@ private:
   std::string instanceId_;
   int contentDelayTime_;
   int totalRegistrationsFailed_;
-  Logger logger_;
+  Logger m_logger;
   std::string configurationFile_;
   ptr_lib::shared_ptr<boost::asio::io_service> ioService_;
   Face face_;
@@ -507,21 +418,23 @@ private:
 
 };
 
+} // namespace ndn
+
 int main( int argc, char* argv[] )
 {
   int option;
-  NdnTrafficServer ndnTrafficServer (argv[0]);
+  ndn::NdnTrafficServer ndnTrafficServer (argv[0]);
   while ((option = getopt(argc, argv, "hd:")) != -1) {
     switch (option) {
-      case 'h'  :
-        ndnTrafficServer.usage();
-        break;
-      case 'd'  :
-        ndnTrafficServer.setContentDelayTime(atoi(optarg));
-        break;
-      default   :
-        ndnTrafficServer.usage();
-        break;
+    case 'h'  :
+      ndnTrafficServer.usage();
+      break;
+    case 'd'  :
+      ndnTrafficServer.setContentDelayTime(atoi(optarg));
+      break;
+    default   :
+      ndnTrafficServer.usage();
+      break;
     }
   }
 
