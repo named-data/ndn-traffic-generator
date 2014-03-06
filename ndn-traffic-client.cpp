@@ -74,6 +74,8 @@ public:
       minimumInterestRoundTripTime = std::numeric_limits<double>::max();
       maximumInterestRoundTripTime = 0;
       totalInterestRoundTripTime = 0;
+      contentInconsistencies = 0;
+      expectedContent = "";
     }
 
     void
@@ -111,6 +113,8 @@ public:
         detail += "Scope="+toString(scope)+", ";
       if (interestLifetime >= 0)
         detail += "InterestLifetime="+toString(interestLifetime)+", ";
+      if (expectedContent != "")
+        detail += "ExpectedContent="+expectedContent+", ";
       if (detail.length() >= 2)
         detail = detail.substr(0, detail.length()-2);
       logger.log(detail, false, false);
@@ -178,6 +182,8 @@ public:
             scope = toInteger(value);
           else if (parameter == "InterestLifetime")
             interestLifetime = toInteger(value);
+          else if (parameter == "ExpectedContent")
+            expectedContent = value;
           else
             logger.log("Line "+toString(lineNumber)+" \t- Invalid Parameter='"+parameter+"'", false, true);
         }
@@ -215,6 +221,8 @@ public:
     double minimumInterestRoundTripTime;
     double maximumInterestRoundTripTime;
     double totalInterestRoundTripTime;
+    int contentInconsistencies;
+    std::string expectedContent;
 
   };
 
@@ -313,7 +321,7 @@ public:
   logStatistics()
   {
     int patternId;
-    double loss, average;
+    double loss, average, inconsistency;
 
     m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
     m_logger.log("Total Traffic Pattern Types = "+toString((int)trafficPattern_.size()), false, true);
@@ -325,9 +333,16 @@ public:
       loss = 0;
     m_logger.log("Total Interest Loss         = "+toString(loss)+"%", false, true);
     if (totalInterestReceived_ > 0)
+    {
       average = totalInterestRoundTripTime_/totalInterestReceived_;
+      inconsistency = contentInconsistencies_*100.0/totalInterestReceived_;
+    }
     else
+    {
       average = 0;
+      inconsistency = 0;
+    }
+    m_logger.log("Total Data Inconsistency    = "+toString(inconsistency)+"%", false, true);
     m_logger.log("Total Round Trip Time       = "+toString(totalInterestRoundTripTime_)+"ms", false, true);
     m_logger.log("Average Round Trip Time     = "+toString(average)+"ms\n", false, true);
 
@@ -347,9 +362,17 @@ public:
           loss = 0;
         m_logger.log("Total Interest Loss         = "+toString(loss)+"%", false, true);
         if (trafficPattern_[patternId].totalInterestReceived > 0)
+        {
           average = trafficPattern_[patternId].totalInterestRoundTripTime/trafficPattern_[patternId].totalInterestReceived;
+          inconsistency = trafficPattern_[patternId].contentInconsistencies;
+          inconsistency = inconsistency*100.0/trafficPattern_[patternId].totalInterestReceived;
+        }
         else
+        {
           average = 0;
+          inconsistency = 0;
+        }
+        m_logger.log("Total Data Inconsistency    = "+toString(inconsistency)+"%", false, true);
         m_logger.log("Total Round Trip Time       = "+toString(trafficPattern_[patternId].totalInterestRoundTripTime)+"ms", false, true);
         m_logger.log("Average Round Trip Time     = "+toString(average)+"ms\n", false, true);
       }
@@ -470,6 +493,11 @@ public:
     bool isOld;
     isOld = true;
     std::srand(std::time(0));
+
+    //Performance Enhancement
+    if (nonceList_.size() > 1000)
+      nonceList_.clear();
+
     do
       {
         randomNonceKey = std::rand();
@@ -503,16 +531,34 @@ public:
           boost::posix_time::ptime sentTime )
   {
     double roundTripTime;
+    int receivedContentLength;
+    std::string receivedContent;
     std::string logLine;
     logLine = "";
     logLine += "Data Received      - PatternType="+toString(patternId+1);
     logLine += ", GlobalID="+toString(globalReference);
     logLine += ", LocalID="+toString(localReference);
     logLine += ", Name="+interest.getName().toUri();
-    m_logger.log(logLine, true, false);
     boost::posix_time::time_duration roundTripDuration;
     totalInterestReceived_++;
     trafficPattern_[patternId].totalInterestReceived++;
+    if (trafficPattern_[patternId].expectedContent != "")
+    {
+      receivedContent = (char*)(data.getContent().value());
+      receivedContentLength = data.getContent().value_size();
+      receivedContent = receivedContent.substr(0, receivedContentLength);
+      if (receivedContent != trafficPattern_[patternId].expectedContent)
+      {
+        contentInconsistencies_++;
+        trafficPattern_[patternId].contentInconsistencies++;
+        logLine += ", IsConsistent=No";
+      }
+      else
+        logLine += ", IsConsistent=Yes";
+    }
+    else
+      logLine += ", IsConsistent=NotChecked";
+    m_logger.log(logLine, true, false);
     roundTripDuration = boost::posix_time::microsec_clock::local_time() - sentTime;
     roundTripTime = roundTripDuration.total_microseconds()/1000.0;
     if (minimumInterestRoundTripTime_ > roundTripTime)
@@ -720,6 +766,7 @@ private:
   std::vector<int> nonceList_;
   int totalInterestSent_;
   int totalInterestReceived_;
+  int contentInconsistencies_;
   double minimumInterestRoundTripTime_;
   double maximumInterestRoundTripTime_;
   double totalInterestRoundTripTime_;
