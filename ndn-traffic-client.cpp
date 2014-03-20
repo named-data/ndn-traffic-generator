@@ -631,9 +631,9 @@ public:
                 if (trafficPattern_[patternId].scope >= 0)
                   interest.setScope(trafficPattern_[patternId].scope);
                 if (trafficPattern_[patternId].interestLifetime >= 0)
-                  interest.setInterestLifetime(trafficPattern_[patternId].interestLifetime);
+                  interest.setInterestLifetime(time::milliseconds(trafficPattern_[patternId].interestLifetime));
                 else
-                  interest.setInterestLifetime(getDefaultInterestLifetime());
+                  interest.setInterestLifetime(time::milliseconds(getDefaultInterestLifetime()));
                 try {
                   totalInterestSent_++;
                   trafficPattern_[patternId].totalInterestSent++;

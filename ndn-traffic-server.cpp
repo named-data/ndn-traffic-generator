@@ -342,7 +342,7 @@ public:
     if (trafficPattern_[patternId].contentType >= 0)
       data.setContentType(trafficPattern_[patternId].contentType);
     if (trafficPattern_[patternId].freshnessPeriod >= 0)
-      data.setFreshnessPeriod(trafficPattern_[patternId].freshnessPeriod);
+      data.setFreshnessPeriod(time::milliseconds(trafficPattern_[patternId].freshnessPeriod));
     if (trafficPattern_[patternId].contentBytes >= 0)
       content = getRandomByteString(trafficPattern_[patternId].contentBytes);
     if (trafficPattern_[patternId].content != "")
