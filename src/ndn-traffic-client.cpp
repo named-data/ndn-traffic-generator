@@ -28,8 +28,7 @@ namespace ndn {
 class NdnTrafficClient
 {
 public:
-
-  NdnTrafficClient( char* programName )
+  NdnTrafficClient(char* programName)
     : m_logger("NDNTrafficClient")
     , ioService_(new boost::asio::io_service)
     , face_(ioService_)
@@ -51,7 +50,6 @@ public:
   class InterestTrafficConfiguration
   {
   public:
-
     InterestTrafficConfiguration()
     {
       trafficPercentage = -1;
@@ -79,7 +77,7 @@ public:
     }
 
     void
-    printTrafficConfiguration( Logger& logger )
+    printTrafficConfiguration(Logger& logger)
     {
       std::string detail;
       detail = "";
@@ -121,7 +119,7 @@ public:
     }
 
     bool
-    extractParameterValue( std::string detail, std::string& parameter, std::string& value )
+    extractParameterValue(const std::string& detail, std::string& parameter, std::string& value)
     {
       int i;
       std::string allowedCharacters = ":/+._-%";
@@ -136,7 +134,8 @@ public:
       if (i == detail.length())
         return false;
       i++;
-      while ((std::isalnum(detail[i]) || allowedCharacters.find(detail[i]) != std::string::npos) && i < detail.length())
+      while ((std::isalnum(detail[i]) || allowedCharacters.find(detail[i]) != std::string::npos) &&
+             i < detail.length())
         {
           value += detail[i];
           i++;
@@ -147,7 +146,7 @@ public:
     }
 
     bool
-    processConfigurationDetail( std::string detail, Logger& logger, int lineNumber )
+    processConfigurationDetail(const std::string& detail, Logger& logger, int lineNumber)
     {
       std::string parameter, value;
       if (extractParameterValue(detail, parameter, value))
@@ -185,11 +184,13 @@ public:
           else if (parameter == "ExpectedContent")
             expectedContent = value;
           else
-            logger.log("Line "+toString(lineNumber)+" \t- Invalid Parameter='"+parameter+"'", false, true);
+            logger.log("Line "+toString(lineNumber) +
+                       " \t- Invalid Parameter='"+parameter+"'", false, true);
         }
       else
         {
-          logger.log("Line "+toString(lineNumber)+" \t- Improper Traffic Configuration Line- "+detail, false, true);
+          logger.log("Line "+toString(lineNumber) +
+                     " \t- Improper Traffic Configuration Line- "+detail, false, true);
           return false;
         }
       return true;
@@ -223,8 +224,7 @@ public:
     double totalInterestRoundTripTime;
     int contentInconsistencies;
     std::string expectedContent;
-
-  };
+  }; // class InterestTrafficConfiguration
 
   int
   getDefaultInterestLifetime()
@@ -233,7 +233,7 @@ public:
   }
 
   static std::string
-  toString( int integerValue )
+  toString(int integerValue)
   {
     std::stringstream stream;
     stream << integerValue;
@@ -241,7 +241,7 @@ public:
   }
 
   static std::string
-  toString( double doubleValue )
+  toString(double doubleValue)
   {
     std::stringstream stream;
     stream << doubleValue;
@@ -249,7 +249,7 @@ public:
   }
 
   static int
-  toInteger( std::string stringValue )
+  toInteger(const std::string& stringValue)
   {
     int integerValue;
     std::stringstream stream(stringValue);
@@ -324,57 +324,64 @@ public:
     double loss, average, inconsistency;
 
     m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
-    m_logger.log("Total Traffic Pattern Types = "+toString((int)trafficPattern_.size()), false, true);
-    m_logger.log("Total Interests Sent        = "+toString(totalInterestSent_), false, true);
-    m_logger.log("Total Responses Received    = "+toString(totalInterestReceived_), false, true);
+    m_logger.log("Total Traffic Pattern Types = " + toString((int)trafficPattern_.size()), false, true);
+    m_logger.log("Total Interests Sent        = " + toString(totalInterestSent_), false, true);
+    m_logger.log("Total Responses Received    = " + toString(totalInterestReceived_), false, true);
     if (totalInterestSent_ > 0)
       loss = (totalInterestSent_-totalInterestReceived_)*100.0/totalInterestSent_;
     else
       loss = 0;
-    m_logger.log("Total Interest Loss         = "+toString(loss)+"%", false, true);
+    m_logger.log("Total Interest Loss         = " + toString(loss)+"%", false, true);
     if (totalInterestReceived_ > 0)
-    {
-      average = totalInterestRoundTripTime_/totalInterestReceived_;
-      inconsistency = contentInconsistencies_*100.0/totalInterestReceived_;
-    }
+      {
+        average = totalInterestRoundTripTime_/totalInterestReceived_;
+        inconsistency = contentInconsistencies_*100.0/totalInterestReceived_;
+      }
     else
-    {
-      average = 0;
-      inconsistency = 0;
-    }
-    m_logger.log("Total Data Inconsistency    = "+toString(inconsistency)+"%", false, true);
-    m_logger.log("Total Round Trip Time       = "+toString(totalInterestRoundTripTime_)+"ms", false, true);
-    m_logger.log("Average Round Trip Time     = "+toString(average)+"ms\n", false, true);
+      {
+        average = 0;
+        inconsistency = 0;
+      }
+    m_logger.log("Total Data Inconsistency    = " + toString(inconsistency)+"%", false, true);
+    m_logger.log("Total Round Trip Time       = " +
+                 toString(totalInterestRoundTripTime_)+"ms", false, true);
+    m_logger.log("Average Round Trip Time     = " + toString(average)+"ms\n", false, true);
 
     for (patternId=0; patternId<trafficPattern_.size(); patternId++)
       {
-        m_logger.log("Traffic Pattern Type #"+toString(patternId+1), false, true);
+        m_logger.log("Traffic Pattern Type #" + toString(patternId+1), false, true);
         trafficPattern_[patternId].printTrafficConfiguration(m_logger);
-        m_logger.log("Total Interests Sent        = "+toString(trafficPattern_[patternId].totalInterestSent), false, true);
-        m_logger.log("Total Responses Received    = "+toString(trafficPattern_[patternId].totalInterestReceived), false, true);
+        m_logger.log("Total Interests Sent        = " +
+                     toString(trafficPattern_[patternId].totalInterestSent), false, true);
+        m_logger.log("Total Responses Received    = " +
+                     toString(trafficPattern_[patternId].totalInterestReceived), false, true);
         if (trafficPattern_[patternId].totalInterestSent > 0)
           {
-            loss = (trafficPattern_[patternId].totalInterestSent-trafficPattern_[patternId].totalInterestReceived);
+            loss = (trafficPattern_[patternId].totalInterestSent -
+                    trafficPattern_[patternId].totalInterestReceived);
             loss *= 100.0;
             loss /= trafficPattern_[patternId].totalInterestSent;
           }
         else
           loss = 0;
-        m_logger.log("Total Interest Loss         = "+toString(loss)+"%", false, true);
+        m_logger.log("Total Interest Loss         = " + toString(loss)+"%", false, true);
         if (trafficPattern_[patternId].totalInterestReceived > 0)
-        {
-          average = trafficPattern_[patternId].totalInterestRoundTripTime/trafficPattern_[patternId].totalInterestReceived;
-          inconsistency = trafficPattern_[patternId].contentInconsistencies;
-          inconsistency = inconsistency*100.0/trafficPattern_[patternId].totalInterestReceived;
-        }
+          {
+            average = (trafficPattern_[patternId].totalInterestRoundTripTime /
+                       trafficPattern_[patternId].totalInterestReceived);
+            inconsistency = trafficPattern_[patternId].contentInconsistencies;
+            inconsistency = inconsistency * 100.0 / trafficPattern_[patternId].totalInterestReceived;
+          }
         else
-        {
-          average = 0;
-          inconsistency = 0;
-        }
-        m_logger.log("Total Data Inconsistency    = "+toString(inconsistency)+"%", false, true);
-        m_logger.log("Total Round Trip Time       = "+toString(trafficPattern_[patternId].totalInterestRoundTripTime)+"ms", false, true);
-        m_logger.log("Average Round Trip Time     = "+toString(average)+"ms\n", false, true);
+          {
+            average = 0;
+            inconsistency = 0;
+          }
+        m_logger.log("Total Data Inconsistency    = " + toString(inconsistency)+"%", false, true);
+        m_logger.log("Total Round Trip Time       = " +
+                     toString(trafficPattern_[patternId].totalInterestRoundTripTime)+"ms",
+                     false, true);
+        m_logger.log("Average Round Trip Time     = " + toString(average)+"ms\n", false, true);
       }
   }
 
@@ -411,7 +418,8 @@ public:
                     while (getline(patternFile, patternLine) && std::isalpha(patternLine[0]))
                       {
                         lineNumber++;
-                        if (!interestData.processConfigurationDetail(patternLine, m_logger, lineNumber))
+                        if (!interestData.processConfigurationDetail(patternLine,
+                                                                     m_logger, lineNumber))
                           {
                             skipLine = true;
                             break;
@@ -431,7 +439,8 @@ public:
         patternFile.close();
         if (!checkTrafficPatternCorrectness())
           {
-            m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper- " + configurationFile_, false, true);
+            m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper- " +
+                         configurationFile_, false, true);
             m_logger.shutdownLogger();
             exit(1);
           }
@@ -445,7 +454,8 @@ public:
       }
     else
       {
-        m_logger.log("ERROR - Unable To Open Traffic Configuration File: " + configurationFile_, false, true);
+        m_logger.log("ERROR - Unable To Open Traffic Configuration File: " +
+                     configurationFile_, false, true);
         m_logger.shutdownLogger();
         exit(1);
       }
@@ -462,14 +472,16 @@ public:
           }
         else
           {
-            m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " + configurationFile_, false, true);
+            m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " +
+                         configurationFile_, false, true);
             m_logger.shutdownLogger();
             exit(1);
           }
       }
     else
       {
-        m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " + configurationFile_, false, true);
+        m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " +
+                     configurationFile_, false, true);
         m_logger.shutdownLogger();
         exit(1);
       }
@@ -543,19 +555,19 @@ public:
     totalInterestReceived_++;
     trafficPattern_[patternId].totalInterestReceived++;
     if (trafficPattern_[patternId].expectedContent != "")
-    {
-      receivedContent = (char*)(data.getContent().value());
-      receivedContentLength = data.getContent().value_size();
-      receivedContent = receivedContent.substr(0, receivedContentLength);
-      if (receivedContent != trafficPattern_[patternId].expectedContent)
       {
-        contentInconsistencies_++;
-        trafficPattern_[patternId].contentInconsistencies++;
-        logLine += ", IsConsistent=No";
+        receivedContent = (char*)(data.getContent().value());
+        receivedContentLength = data.getContent().value_size();
+        receivedContent = receivedContent.substr(0, receivedContentLength);
+        if (receivedContent != trafficPattern_[patternId].expectedContent)
+          {
+            contentInconsistencies_++;
+            trafficPattern_[patternId].contentInconsistencies++;
+            logLine += ", IsConsistent=No";
+          }
+        else
+          logLine += ", IsConsistent=Yes";
       }
-      else
-        logLine += ", IsConsistent=Yes";
-    }
     else
       logLine += ", IsConsistent=NotChecked";
     m_logger.log(logLine, true, false);
@@ -622,7 +634,8 @@ public:
                 if (trafficPattern_[patternId].maxSuffixComponents >= 0)
                   interest.setMaxSuffixComponents(trafficPattern_[patternId].maxSuffixComponents);
                 Exclude exclude;
-                if (trafficPattern_[patternId].excludeBefore != "" &&  trafficPattern_[patternId].excludeAfter != "")
+                if (trafficPattern_[patternId].excludeBefore != "" &&
+                    trafficPattern_[patternId].excludeAfter != "")
                   {
                     exclude.excludeRange(name::Component(trafficPattern_[patternId].excludeAfter),
                                          name::Component(trafficPattern_[patternId].excludeBefore));
@@ -638,20 +651,24 @@ public:
                     exclude.excludeAfter(name::Component(trafficPattern_[patternId].excludeAfter));
                     interest.setExclude(exclude);
                   }
-                if (trafficPattern_[patternId].excludeBeforeBytes > 0 &&  trafficPattern_[patternId].excludeAfterBytes > 0)
+                if (trafficPattern_[patternId].excludeBeforeBytes > 0 &&
+                    trafficPattern_[patternId].excludeAfterBytes > 0)
                   {
-                    exclude.excludeRange(name::Component(getRandomByteString(trafficPattern_[patternId].excludeAfterBytes)),
-                                         name::Component(getRandomByteString(trafficPattern_[patternId].excludeBeforeBytes)));
+                    exclude.excludeRange(
+                      name::Component(getRandomByteString(trafficPattern_[patternId].excludeAfterBytes)),
+                      name::Component(getRandomByteString(trafficPattern_[patternId].excludeBeforeBytes)));
                     interest.setExclude(exclude);
                   }
                 else if (trafficPattern_[patternId].excludeBeforeBytes > 0)
                   {
-                    exclude.excludeBefore(name::Component(getRandomByteString(trafficPattern_[patternId].excludeBeforeBytes)));
+                    exclude.excludeBefore(
+                      name::Component(getRandomByteString(trafficPattern_[patternId].excludeBeforeBytes)));
                     interest.setExclude(exclude);
                   }
                 else if (trafficPattern_[patternId].excludeAfterBytes > 0)
                   {
-                    exclude.excludeAfter(name::Component(getRandomByteString(trafficPattern_[patternId].excludeAfterBytes)));
+                    exclude.excludeAfter(
+                      name::Component(getRandomByteString(trafficPattern_[patternId].excludeAfterBytes)));
                     interest.setExclude(exclude);
                   }
 
@@ -677,26 +694,28 @@ public:
                 if (trafficPattern_[patternId].scope >= 0)
                   interest.setScope(trafficPattern_[patternId].scope);
                 if (trafficPattern_[patternId].interestLifetime >= 0)
-                  interest.setInterestLifetime(time::milliseconds(trafficPattern_[patternId].interestLifetime));
+                  interest.setInterestLifetime(
+                    time::milliseconds(trafficPattern_[patternId].interestLifetime));
                 else
-                  interest.setInterestLifetime(time::milliseconds(getDefaultInterestLifetime()));
+                  interest.setInterestLifetime(
+                    time::milliseconds(getDefaultInterestLifetime()));
                 try {
                   totalInterestSent_++;
                   trafficPattern_[patternId].totalInterestSent++;
                   boost::posix_time::ptime sentTime;
                   sentTime = boost::posix_time::microsec_clock::local_time();
                   face_.expressInterest(interest,
-                                        func_lib::bind( &NdnTrafficClient::onData,
-                                                        this, boost::ref(face_),
-                                                        _1, _2, totalInterestSent_,
-                                                        trafficPattern_[patternId].totalInterestSent,
-                                                        patternId,
-                                                        sentTime),
-                                        func_lib::bind( &NdnTrafficClient::onTimeout,
-                                                        this, boost::ref(face_),
-                                                        _1, totalInterestSent_,
-                                                        trafficPattern_[patternId].totalInterestSent,
-                                                        patternId));
+                                        bind( &NdnTrafficClient::onData,
+                                              this, boost::ref(face_),
+                                              _1, _2, totalInterestSent_,
+                                              trafficPattern_[patternId].totalInterestSent,
+                                              patternId,
+                                              sentTime),
+                                        bind( &NdnTrafficClient::onTimeout,
+                                              this, boost::ref(face_),
+                                              _1, totalInterestSent_,
+                                              trafficPattern_[patternId].totalInterestSent,
+                                              patternId));
                   std::string logLine;
                   logLine = "";
                   logLine += "Sending Interest   - PatternType="+toString(patternId+1);
@@ -706,10 +725,10 @@ public:
                   m_logger.log(logLine, true, false);
                   deadlineTimer->expires_at(deadlineTimer->expires_at() +
                                             boost::posix_time::millisec(interestInterval_));
-                  deadlineTimer->async_wait(boost::bind(&NdnTrafficClient::generateTraffic,
-                                                        this,
-                                                        boost::asio::placeholders::error,
-                                                        deadlineTimer));
+                  deadlineTimer->async_wait(bind(&NdnTrafficClient::generateTraffic,
+                                                 this,
+                                                 boost::asio::placeholders::error,
+                                                 deadlineTimer));
                 }
                 catch (std::exception &e) {
                   m_logger.log("ERROR: "+(std::string)e.what(), true, true);
@@ -721,10 +740,10 @@ public:
           {
             deadlineTimer->expires_at(deadlineTimer->expires_at() +
                                       boost::posix_time::millisec(interestInterval_));
-            deadlineTimer->async_wait(boost::bind(&NdnTrafficClient::generateTraffic,
-                                                  this,
-                                                  boost::asio::placeholders::error,
-                                                  deadlineTimer));
+            deadlineTimer->async_wait(bind(&NdnTrafficClient::generateTraffic,
+                                           this,
+                                           boost::asio::placeholders::error,
+                                           deadlineTimer));
           }
       }
   }
@@ -733,15 +752,15 @@ public:
   initialize()
   {
     boost::asio::signal_set signalSet(*ioService_, SIGINT, SIGTERM);
-    signalSet.async_wait(boost::bind(&NdnTrafficClient::signalHandler, this));
+    signalSet.async_wait(bind(&NdnTrafficClient::signalHandler, this));
     m_logger.initializeLog(instanceId_);
     initializeTrafficConfiguration();
     boost::asio::deadline_timer deadlineTimer(*ioService_,
                                               boost::posix_time::millisec(interestInterval_));
-    deadlineTimer.async_wait(boost::bind(&NdnTrafficClient::generateTraffic,
-                                         this,
-                                         boost::asio::placeholders::error,
-                                         &deadlineTimer));
+    deadlineTimer.async_wait(bind(&NdnTrafficClient::generateTraffic,
+                                  this,
+                                  boost::asio::placeholders::error,
+                                  &deadlineTimer));
     try {
       face_.processEvents();
     }

@@ -84,14 +84,16 @@ public:
               std::cout << "Log File Initialized: " << logFilename << std::endl;
             else
               {
-                std::cout << "ERROR - Unable To Initialize A Log File At: " << m_logLocation << std::endl
+                std::cout << "ERROR - Unable To Initialize A Log File At: "
+                          << m_logLocation << std::endl
                           << "Using Default Output For Logging." << std::endl;
                 m_logLocation = "";
               }
           }
         else
           {
-            std::cout << "Environment Variable NDN_TRAFFIC_LOGFOLDER Should Be A Folder." << std::endl
+            std::cout << "Environment Variable NDN_TRAFFIC_LOGFOLDER Should Be A Folder."
+                      << std::endl
                       << "Using Default Output For Logging." << std::endl;
             m_logLocation = "";
           }

@@ -21,8 +21,7 @@ namespace ndn {
 class NdnTrafficServer
 {
 public:
-  
-  NdnTrafficServer( char* programName )
+  NdnTrafficServer(char* programName)
     : m_logger("NDNTrafficServer")
     , ioService_(new boost::asio::io_service)
     , face_(ioService_)
@@ -40,7 +39,6 @@ public:
   class DataTrafficConfiguration
   {
   public:
-
     DataTrafficConfiguration()
     {
       name = "";
@@ -52,7 +50,7 @@ public:
     }
 
     void
-    printTrafficConfiguration( Logger& logger )
+    printTrafficConfiguration(Logger& logger)
     {
       std::string detail;
       detail = "";
@@ -73,7 +71,8 @@ public:
 
 
     bool
-    extractParameterValue( std::string detail, std::string& parameter, std::string& value )
+    extractParameterValue(const std::string& detail,
+                          std::string& parameter, std::string& value)
     {
       int i;
       std::string allowedCharacters = ":/+._-%";
@@ -88,7 +87,9 @@ public:
       if (i == detail.length())
         return false;
       i++;
-      while ((std::isalnum(detail[i]) || allowedCharacters.find(detail[i]) != std::string::npos) && i < detail.length())
+      while ((std::isalnum(detail[i]) ||
+              allowedCharacters.find(detail[i]) != std::string::npos) &&
+             i < detail.length())
         {
           value += detail[i];
           i++;
@@ -99,7 +100,8 @@ public:
     }
 
     bool
-    processConfigurationDetail( std::string detail, Logger& logger, int lineNumber )
+    processConfigurationDetail(const std::string& detail,
+                               Logger& logger, int lineNumber)
     {
       std::string parameter, value;
       if (extractParameterValue(detail, parameter, value))
@@ -115,11 +117,13 @@ public:
           else if (parameter == "Content")
             content = value;
           else
-            logger.log("Line "+toString(lineNumber)+" \t- Invalid Parameter='"+parameter+"'", false, true);
+            logger.log("Line "+toString(lineNumber)+
+                       " \t- Invalid Parameter='"+parameter+"'", false, true);
         }
       else
         {
-          logger.log("Line "+toString(lineNumber)+" \t- Improper Traffic Configuration Line- "+detail, false, true);
+          logger.log("Line "+toString(lineNumber)+
+                     " \t- Improper Traffic Configuration Line- "+detail, false, true);
           return false;
         }
       return true;
@@ -147,7 +151,7 @@ public:
   }
 
   static std::string
-  toString( int integerValue )
+  toString(int integerValue)
   {
     std::stringstream stream;
     stream << integerValue;
@@ -155,7 +159,7 @@ public:
   }
 
   static int
-  toInteger( std::string stringValue )
+  toInteger(std::string stringValue)
   {
     int integerValue;
     std::stringstream stream(stringValue);
@@ -185,7 +189,7 @@ public:
   }
 
   void
-  setContentDelayTime( int contentDelayTime )
+  setContentDelayTime(int contentDelayTime)
   {
     if (contentDelayTime < 0)
       usage();
@@ -193,7 +197,7 @@ public:
   }
 
   void
-  setConfigurationFile( char* configurationFile )
+  setConfigurationFile(char* configurationFile)
   {
     configurationFile_ = configurationFile;
   }
@@ -213,13 +217,17 @@ public:
   {
     int patternId;
     m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
-    m_logger.log("Total Traffic Pattern Types = "+toString((int)trafficPattern_.size()), false, true);
-    m_logger.log("Total Interests Received    = "+toString(totalInterestReceived_), false, true);
+    m_logger.log("Total Traffic Pattern Types = " +
+                 toString((int)trafficPattern_.size()), false, true);
+    m_logger.log("Total Interests Received    = " +
+                 toString(totalInterestReceived_), false, true);
+
     for (patternId=0; patternId<trafficPattern_.size(); patternId++)
       {
         m_logger.log("\nTraffic Pattern Type #"+toString(patternId+1), false, true);
         trafficPattern_[patternId].printTrafficConfiguration(m_logger);
-        m_logger.log("Total Interests Received    = "+toString(trafficPattern_[patternId].totalInterestReceived)+"\n", false, true);
+        m_logger.log("Total Interests Received    = " +
+                     toString(trafficPattern_[patternId].totalInterestReceived)+"\n", false, true);
       }
   }
 
@@ -276,7 +284,8 @@ public:
         patternFile.close();
         if (!checkTrafficPatternCorrectness())
           {
-            m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper- " + configurationFile_, false, true);
+            m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper- " +
+                         configurationFile_, false, true);
             m_logger.shutdownLogger();
             exit(1);
           }
@@ -290,7 +299,8 @@ public:
       }
     else
       {
-        m_logger.log("ERROR - Unable To Open Traffic Configuration File: " + configurationFile_, false, true);
+        m_logger.log("ERROR - Unable To Open Traffic Configuration File: " +
+                     configurationFile_, false, true);
         m_logger.shutdownLogger();
         exit(1);
       }
@@ -307,21 +317,23 @@ public:
           }
         else
           {
-            m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " + configurationFile_, false, true);
+            m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " +
+                         configurationFile_, false, true);
             m_logger.shutdownLogger();
             exit(1);
           }
       }
     else
       {
-        m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " + configurationFile_, false, true);
+        m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " +
+                     configurationFile_, false, true);
         m_logger.shutdownLogger();
         exit(1);
       }
   }
 
   static std::string
-  getRandomByteString( int randomSize )
+  getRandomByteString(int randomSize)
   {
     int i;
     std::string characterSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw0123456789";
@@ -332,7 +344,7 @@ public:
   }
 
   void
-  onInterest( const Name& name, const Interest& interest, int patternId )
+  onInterest(const Name& name, const Interest& interest, int patternId)
   {
     std::string content, logLine;
     content = "";
@@ -361,7 +373,7 @@ public:
   }
 
   void
-  onRegisterFailed( const ndn::Name& prefix, const std::string& reason, int patternId )
+  onRegisterFailed(const ndn::Name& prefix, const std::string& reason, int patternId)
   {
     std::string logLine;
     logLine = "";
@@ -382,15 +394,15 @@ public:
     initializeTrafficConfiguration();
 
     int patternId;
-    for (patternId=0; patternId<trafficPattern_.size(); patternId++ )
+    for (patternId=0; patternId<trafficPattern_.size(); patternId++)
       {
-        face_.setInterestFilter(  trafficPattern_[patternId].name,
-                                  func_lib::bind( &NdnTrafficServer::onInterest,
-                                                  this, _1, _2,
-                                                  patternId),
-                                  func_lib::bind( &NdnTrafficServer::onRegisterFailed,
-                                                  this, _1, _2,
-                                                  patternId));
+        face_.setInterestFilter(trafficPattern_[patternId].name,
+                                bind(&NdnTrafficServer::onInterest,
+                                     this, _1, _2,
+                                     patternId),
+                                bind(&NdnTrafficServer::onRegisterFailed,
+                                     this, _1, _2,
+                                     patternId));
       }
 
     try {
@@ -403,7 +415,6 @@ public:
   }
 
 private:
-
   KeyChain keyChain_;
   std::string programName_;
   std::string instanceId_;
@@ -415,12 +426,12 @@ private:
   Face face_;
   std::vector<DataTrafficConfiguration> trafficPattern_;
   int totalInterestReceived_;
-
 };
 
 } // namespace ndn
 
-int main( int argc, char* argv[] )
+int
+main(int argc, char* argv[])
 {
   int option;
   ndn::NdnTrafficServer ndnTrafficServer (argv[0]);
