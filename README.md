@@ -11,35 +11,32 @@ to configure various parameters.
 
 Compiling and running ndn-traffic-generator requires the following dependencies:
 
-1. C++ Boost Libraries version >= 1.48
+1. C++ Boost Libraries version >= 1.48 <http://www.boost.org>
 
-    On Ubuntu 12.04:
+On Ubuntu 12.04:
 
-        sudo apt-get install libboost1.48-all-dev
+    sudo apt-get install libboost1.48-all-dev
 
-    On Ubuntu 13.10 and later
+On Ubuntu 13.10 and later
 
-        sudo apt-get install libboost-all-dev
+    sudo apt-get install libboost-all-dev
 
-    On OSX with macports
+On OSX with macports
 
-        sudo port install boost
+    sudo port install boost
 
-    On OSX with brew
+On OSX with brew
 
-        brew install boost
+    brew install boost
 
-    On other platforms Boost Libraries can be installed from the packaged version for the
-    distribution, if the version matches requirements, or compiled from source
-    (http://www.boost.org)
+On other platforms Boost Libraries can be installed from the packaged version for the
+distribution, if the version matches requirements, or compiled from source
 
-2. ndn-cpp-dev library (https://github.com/named-data/ndn-cpp-dev)
+2. ndn-cpp-dev library <https://github.com/named-data/ndn-cpp-dev>
 
-    For detailed installation instructions refer to
-    https://github.com/named-data/ndn-cpp-dev/blob/master/INSTALL.md and/or
-    https://github.com/named-data/ndn-cpp-dev
+For detailed installation instructions, please refer README file
 
-3. NDN forwarding daemon (https://github.com/named-data/NFD)
+3. NDN forwarding daemon <https://github.com/named-data/NFD>
 
 -----------------------------------------------------
 
@@ -55,14 +52,15 @@ Compiling and running ndn-traffic-generator requires the following dependencies:
     Respond to Interest as per provided Traffic Configuration File
     Multiple Prefixes can be configured for handling.
     Set environment variable NDN_TRAFFIC_LOGFOLDER for redirecting output to a log.
-      [-d interval] - set delay before responding to interest in milliseconds (minimum 0 milliseconds)
+      [-d interval] - set delay before responding to interest in milliseconds
+      [-c count]    - specify maximum number of interests to be satisfied
       [-h] - print help and exit
 
     Usage: ndntraffic [options] <Traffic_Configuration_File>
     Generate Interest Traffic as per provided Traffic Configuration File
     Interests are continuously generated unless a total number is specified.
     Set environment variable NDN_TRAFFIC_LOGFOLDER for redirecting output to a log.
-      [-i interval] - set interest generation interval in milliseconds (minimum 1000 milliseconds)
+      [-i interval] - set interest generation interval in milliseconds (default 1000 milliseconds)
       [-c count] - set total number of interests to be generated
       [-h] - print help and exit
 

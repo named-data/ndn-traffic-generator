@@ -24,6 +24,7 @@
 #FreshnessPeriod=NNI [Milliseconds]
 #ContentBytes=NNI [>0]
 #Content=String
+#ContentDelay=NNI [Milliseconds]
 #
 #
 ##########

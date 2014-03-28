@@ -10,6 +10,7 @@
 #include <sstream>
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <ndn-cpp-dev/face.hpp>
 #include <ndn-cpp-dev/security/key-chain.hpp>
@@ -21,64 +22,67 @@ namespace ndn {
 class NdnTrafficServer
 {
 public:
+
+  explicit
   NdnTrafficServer(char* programName)
-    : m_logger("NDNTrafficServer")
-    , ioService_(new boost::asio::io_service)
-    , face_(ioService_)
-    , keyChain_()
+    : m_logger("NdnTrafficServer")
+    , m_programName(programName)
+    , m_hasError(false)
+    , m_nRegistrationsFailed(0)
+    , m_nMaximumInterests(-1)
+    , m_nInterestsReceived(0)
+    , m_contentDelay(time::milliseconds(-1))
+    , m_ioService(new boost::asio::io_service)
+    , m_face(m_ioService)
   {
-    std::srand(std::time(0));
-    instanceId_ = toString(std::rand());
-    programName_ = programName;
-    contentDelayTime_ = getDefaultContentDelayTime();
-    totalRegistrationsFailed_ = 0;
-    configurationFile_ = "";
-    totalInterestReceived_ = 0;
+    m_instanceId = boost::lexical_cast<std::string>(std::rand());
   }
 
   class DataTrafficConfiguration
   {
   public:
     DataTrafficConfiguration()
+      : m_contentType(-1)
+      , m_freshnessPeriod(time::milliseconds(-1))
+      , m_contentBytes(-1)
+      , m_contentDelay(time::milliseconds(-1))
+      , m_nInterestsReceived(0)
     {
-      name = "";
-      contentType = -1;
-      freshnessPeriod = -1;
-      contentBytes = -1;
-      content = "";
-      totalInterestReceived = 0;
     }
 
     void
     printTrafficConfiguration(Logger& logger)
     {
-      std::string detail;
-      detail = "";
-      if (name != "")
-        detail += "Name="+name+", ";
-      if (contentType >= 0)
-        detail += "ContentType="+toString(contentType)+", ";
-      if (freshnessPeriod >= 0)
-        detail += "FreshnessPeriod="+toString(freshnessPeriod)+", ";
-      if (contentBytes >= 0)
-        detail += "ContentBytes="+toString(contentBytes)+", ";
-      if (content != "")
-        detail += "Content="+content+", ";
+      std::string detail = "";
+      if (m_name != "")
+        detail += "Name=" + m_name + ", ";
+      if (m_contentType >= 0)
+        detail += "ContentType=" + boost::lexical_cast<std::string>(m_contentType) + ", ";
+      if (m_freshnessPeriod >= time::milliseconds(0))
+        detail += "FreshnessPeriod=" +
+          boost::lexical_cast<std::string>(static_cast<int>(m_freshnessPeriod.count())) + ", ";
+      if (m_contentBytes >= 0)
+        detail += "ContentBytes=" + boost::lexical_cast<std::string>(m_contentBytes) + ", ";
+      if (m_contentDelay >= time::milliseconds(0))
+        detail += "ContentDelay=" +
+          boost::lexical_cast<std::string>(m_contentDelay.count()) + ", ";
+      if (m_content != "")
+        detail += "Content=" + m_content + ", ";
       if (detail.length() >= 2)
-        detail = detail.substr(0, detail.length()-2);
+        detail = detail.substr(0, detail.length() - 2);
       logger.log(detail, false, false);
     }
 
 
     bool
     extractParameterValue(const std::string& detail,
-                          std::string& parameter, std::string& value)
+                          std::string& parameter,
+                          std::string& value)
     {
-      int i;
       std::string allowedCharacters = ":/+._-%";
       parameter = "";
       value = "";
-      i = 0;
+      int i = 0;
       while (detail[i] != '=' && i < detail.length())
         {
           parameter += detail[i];
@@ -89,7 +93,7 @@ public:
       i++;
       while ((std::isalnum(detail[i]) ||
               allowedCharacters.find(detail[i]) != std::string::npos) &&
-             i < detail.length())
+              i < detail.length())
         {
           value += detail[i];
           i++;
@@ -101,29 +105,32 @@ public:
 
     bool
     processConfigurationDetail(const std::string& detail,
-                               Logger& logger, int lineNumber)
+                               Logger& logger,
+                               int lineNumber)
     {
       std::string parameter, value;
       if (extractParameterValue(detail, parameter, value))
         {
           if (parameter == "Name")
-            name = value;
+            m_name = value;
           else if (parameter == "ContentType")
-            contentType = toInteger(value);
+            m_contentType = boost::lexical_cast<int>(value);
           else if (parameter == "FreshnessPeriod")
-            freshnessPeriod = toInteger(value);
+            m_freshnessPeriod = time::milliseconds(boost::lexical_cast<int>(value));
+          else if (parameter == "ContentDelay")
+            m_contentDelay = time::milliseconds(boost::lexical_cast<int>(value));
           else if (parameter == "ContentBytes")
-            contentBytes = toInteger(value);
+            m_contentBytes = boost::lexical_cast<int>(value);
           else if (parameter == "Content")
-            content = value;
+            m_content = value;
           else
-            logger.log("Line "+toString(lineNumber)+
-                       " \t- Invalid Parameter='"+parameter+"'", false, true);
+            logger.log("Line " + boost::lexical_cast<std::string>(lineNumber) +
+                       " \t- Invalid Parameter='" + parameter + "'", false, true);
         }
       else
         {
-          logger.log("Line "+toString(lineNumber)+
-                     " \t- Improper Traffic Configuration Line- "+detail, false, true);
+          logger.log("Line " + boost::lexical_cast<std::string>(lineNumber) +
+            " \t- Improper Traffic Configuration Line - " + detail, false, true);
           return false;
         }
       return true;
@@ -135,99 +142,90 @@ public:
       return true;
     }
 
-    std::string name;
-    int contentType;
-    int freshnessPeriod;
-    int contentBytes;
-    std::string content;
-    int totalInterestReceived;
+    std::string m_name;
+    int m_contentType;
+    time::milliseconds m_freshnessPeriod;
+    int m_contentBytes;
+    time::milliseconds m_contentDelay;
+    std::string m_content;
+    int m_nInterestsReceived;
 
   };
-
-  std::string
-  getDefaultContent()
-  {
-    return "";
-  }
-
-  static std::string
-  toString(int integerValue)
-  {
-    std::stringstream stream;
-    stream << integerValue;
-    return stream.str();
-  }
-
-  static int
-  toInteger(std::string stringValue)
-  {
-    int integerValue;
-    std::stringstream stream(stringValue);
-    stream >> integerValue;
-    return integerValue;
-  }
 
   void
   usage()
   {
 
-    std::cout << "\nUsage: " << programName_ << " [options] <Traffic_Configuration_File>\n"
+    std::cout << "\nUsage: " << m_programName << " [options] <Traffic_Configuration_File>\n"
       "Respond to Interest as per provided Traffic Configuration File\n"
       "Multiple Prefixes can be configured for handling.\n"
       "Set environment variable NDN_TRAFFIC_LOGFOLDER for redirecting output to a log.\n"
-      "  [-d interval] - set delay before responding to interest in milliseconds (minimum "
-              << getDefaultContentDelayTime() << " milliseconds)\n"
-      "  [-h] - print help and exit\n\n";
+      "  [-d interval] - set delay before responding to interest in milliseconds\n"
+      "  [-c count]    - specify maximum number of interests to be satisfied\n"
+      "  [-h]          - print help and exit\n\n";
     exit(1);
 
   }
 
-  int
-  getDefaultContentDelayTime()
+  void
+  setMaximumInterests(int maximumInterests)
   {
-    return 0;
+    if (maximumInterests < 0)
+      usage();
+    m_nMaximumInterests = maximumInterests;
+  }
+
+  bool
+  hasError() const
+  {
+    return m_hasError;
   }
 
   void
-  setContentDelayTime(int contentDelayTime)
+  setContentDelay(int contentDelay)
   {
-    if (contentDelayTime < 0)
+    if (contentDelay < 0)
       usage();
-    contentDelayTime_ = contentDelayTime;
+    m_contentDelay = time::milliseconds(contentDelay);
   }
 
   void
   setConfigurationFile(char* configurationFile)
   {
-    configurationFile_ = configurationFile;
+    m_configurationFile = configurationFile;
   }
 
   void
   signalHandler()
   {
-    m_logger.shutdownLogger();
-    face_.shutdown();
-    ioService_.reset();
     logStatistics();
-    exit(1);
+    m_logger.shutdownLogger();
+    m_face.shutdown();
+    m_ioService->stop();
+    if (m_hasError)
+      exit(1);
+    else
+      exit(0);
   }
 
   void
   logStatistics()
   {
-    int patternId;
     m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
     m_logger.log("Total Traffic Pattern Types = " +
-                 toString((int)trafficPattern_.size()), false, true);
+      boost::lexical_cast<std::string>(m_trafficPatterns.size()), false, true);
     m_logger.log("Total Interests Received    = " +
-                 toString(totalInterestReceived_), false, true);
-
-    for (patternId=0; patternId<trafficPattern_.size(); patternId++)
+      boost::lexical_cast<std::string>(m_nInterestsReceived), false, true);
+    if (m_nInterestsReceived < m_nMaximumInterests)
+      m_hasError = true;
+    for (int patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
       {
-        m_logger.log("\nTraffic Pattern Type #"+toString(patternId+1), false, true);
-        trafficPattern_[patternId].printTrafficConfiguration(m_logger);
+        m_logger.log("\nTraffic Pattern Type #" +
+          boost::lexical_cast<std::string>(patternId + 1), false, true);
+        m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
         m_logger.log("Total Interests Received    = " +
-                     toString(trafficPattern_[patternId].totalInterestReceived)+"\n", false, true);
+          boost::lexical_cast<std::string>(
+            m_trafficPatterns[patternId].m_nInterestsReceived) + "\n", false, true);
       }
   }
 
@@ -238,46 +236,45 @@ public:
   }
 
   void
-  analyzeConfigurationFile()
+  parseConfigurationFile()
   {
-    int patternId;
-    int lineNumber;
-    bool skipLine;
     std::string patternLine;
     std::ifstream patternFile;
-    m_logger.log("Analyzing Traffic Configuration File: " + configurationFile_, true, true);
-    patternFile.open(configurationFile_.c_str());
+    m_logger.log("Analyzing Traffic Configuration File: " + m_configurationFile, true, true);
+    patternFile.open(m_configurationFile.c_str());
     if (patternFile.is_open())
       {
-        patternId = 0;
-        lineNumber = 0;
+        int patternId = 0;
+        int lineNumber = 0;
         while (getline(patternFile, patternLine))
           {
             lineNumber++;
             if (std::isalpha(patternLine[0]))
               {
                 DataTrafficConfiguration dataData;
-                skipLine = false;
+                bool shouldSkipLine = false;
                 patternId++;
                 if (dataData.processConfigurationDetail(patternLine, m_logger, lineNumber))
                   {
                     while (getline(patternFile, patternLine) && std::isalpha(patternLine[0]))
                       {
                         lineNumber++;
-                        if (!dataData.processConfigurationDetail(patternLine, m_logger, lineNumber))
+                        if (!dataData.processConfigurationDetail(patternLine,
+                                                                 m_logger,
+                                                                 lineNumber))
                           {
-                            skipLine = true;
+                            shouldSkipLine = true;
                             break;
                           }
                       }
                     lineNumber++;
                   }
                 else
-                  skipLine = true;
-                if( !skipLine )
+                  shouldSkipLine = true;
+                if (!shouldSkipLine)
                   {
                     if (dataData.checkTrafficDetailCorrectness())
-                      trafficPattern_.push_back(dataData);
+                      m_trafficPatterns.push_back(dataData);
                   }
               }
           }
@@ -285,22 +282,23 @@ public:
         if (!checkTrafficPatternCorrectness())
           {
             m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper- " +
-                         configurationFile_, false, true);
+                         m_configurationFile, false, true);
             m_logger.shutdownLogger();
             exit(1);
           }
         m_logger.log("Traffic Configuration File Processing Completed\n", true, false);
-        for (patternId = 0; patternId < trafficPattern_.size(); patternId++)
+        for (patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
           {
-            m_logger.log("Traffic Pattern Type #"+toString(patternId+1), false, false);
-            trafficPattern_[patternId].printTrafficConfiguration(m_logger);
+            m_logger.log("Traffic Pattern Type #" +
+              boost::lexical_cast<std::string>(patternId + 1), false, false);
+            m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
             m_logger.log("", false, false);
           }
       }
     else
       {
         m_logger.log("ERROR - Unable To Open Traffic Configuration File: " +
-                     configurationFile_, false, true);
+          m_configurationFile, false, true);
         m_logger.shutdownLogger();
         exit(1);
       }
@@ -309,16 +307,16 @@ public:
   void
   initializeTrafficConfiguration()
   {
-    if (boost::filesystem::exists(boost::filesystem::path(configurationFile_)))
+    if (boost::filesystem::exists(boost::filesystem::path(m_configurationFile)))
       {
-        if(boost::filesystem::is_regular_file(boost::filesystem::path(configurationFile_)))
+        if (boost::filesystem::is_regular_file(boost::filesystem::path(m_configurationFile)))
           {
-            analyzeConfigurationFile();
+            parseConfigurationFile();
           }
         else
           {
             m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " +
-                         configurationFile_, false, true);
+              m_configurationFile, false, true);
             m_logger.shutdownLogger();
             exit(1);
           }
@@ -326,7 +324,7 @@ public:
     else
       {
         m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " +
-                     configurationFile_, false, true);
+          m_configurationFile, false, true);
         m_logger.shutdownLogger();
         exit(1);
       }
@@ -335,97 +333,123 @@ public:
   static std::string
   getRandomByteString(int randomSize)
   {
-    int i;
-    std::string characterSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw0123456789";
-    std::string randomData;
-    for (i=0; i<randomSize; i++)
-      randomData += characterSet[std::rand() % characterSet.length()];
-    return randomData;
+    std::string randomString;
+    for (int i = 0; i < randomSize; i++)
+      randomString += static_cast<char>(std::rand() % 128);
+    return randomString;
   }
 
   void
   onInterest(const Name& name, const Interest& interest, int patternId)
   {
-    std::string content, logLine;
-    content = "";
-    logLine = "";
+    if (m_nMaximumInterests < 0 || m_nInterestsReceived < m_nMaximumInterests)
+      {
+        Data data(interest.getName());
 
-    Data data(interest.getName());
-    if (trafficPattern_[patternId].contentType >= 0)
-      data.setContentType(trafficPattern_[patternId].contentType);
-    if (trafficPattern_[patternId].freshnessPeriod >= 0)
-      data.setFreshnessPeriod(time::milliseconds(trafficPattern_[patternId].freshnessPeriod));
-    if (trafficPattern_[patternId].contentBytes >= 0)
-      content = getRandomByteString(trafficPattern_[patternId].contentBytes);
-    if (trafficPattern_[patternId].content != "")
-      content = trafficPattern_[patternId].content;
-    data.setContent((const uint8_t*)content.c_str(), content.length());
-    keyChain_.sign(data);
-    totalInterestReceived_++;
-    trafficPattern_[patternId].totalInterestReceived++;
-    logLine += "Interest Received          - PatternType="+toString(patternId+1);
-    logLine += ", GlobalID="+toString(totalInterestReceived_);
-    logLine += ", LocalID="+toString(trafficPattern_[patternId].totalInterestReceived);
-    logLine += ", Name="+trafficPattern_[patternId].name;
-    m_logger.log(logLine, true, false);
-    usleep(contentDelayTime_*1000);
-    face_.put(data);
+        if (m_trafficPatterns[patternId].m_contentType >= 0)
+          data.setContentType(m_trafficPatterns[patternId].m_contentType);
+
+        if (m_trafficPatterns[patternId].m_freshnessPeriod >= time::milliseconds(0))
+          data.setFreshnessPeriod(m_trafficPatterns[patternId].m_freshnessPeriod);
+
+        std::string content = "";
+        if (m_trafficPatterns[patternId].m_contentBytes >= 0)
+          content = getRandomByteString(m_trafficPatterns[patternId].m_contentBytes);
+        if (m_trafficPatterns[patternId].m_content != "")
+          content = m_trafficPatterns[patternId].m_content;
+
+        data.setContent(reinterpret_cast<const uint8_t*>(content.c_str()), content.length());
+        m_keyChain.sign(data);
+        m_nInterestsReceived++;
+        m_trafficPatterns[patternId].m_nInterestsReceived++;
+        std::string logLine = "Interest Received          - PatternType=" +
+          boost::lexical_cast<std::string>(patternId + 1);
+        logLine += ", GlobalID=" + boost::lexical_cast<std::string>(m_nInterestsReceived);
+        logLine += ", LocalID=" +
+          boost::lexical_cast<std::string>(m_trafficPatterns[patternId].m_nInterestsReceived);
+        logLine += ", Name=" + m_trafficPatterns[patternId].m_name;
+        m_logger.log(logLine, true, false);
+        if (m_trafficPatterns[patternId].m_contentDelay > time::milliseconds(-1))
+          usleep(m_trafficPatterns[patternId].m_contentDelay.count() * 1000);
+        if (m_contentDelay > time::milliseconds(-1))
+          usleep(m_contentDelay.count() * 1000);
+        m_face.put(data);
+      }
+    if (m_nMaximumInterests >= 0 && m_nInterestsReceived == m_nMaximumInterests)
+      {
+        logStatistics();
+        m_logger.shutdownLogger();
+        m_face.shutdown();
+        m_ioService->stop();
+      }
   }
 
   void
   onRegisterFailed(const ndn::Name& prefix, const std::string& reason, int patternId)
   {
-    std::string logLine;
-    logLine = "";
-    logLine += "Prefix Registration Failed - PatternType="+toString(patternId+1);
-    logLine += ", Name="+trafficPattern_[patternId].name;
+    std::string logLine = "";
+    logLine += "Prefix Registration Failed - PatternType=" +
+      boost::lexical_cast<std::string>(patternId + 1);
+    logLine += ", Name=" + m_trafficPatterns[patternId].m_name;
     m_logger.log(logLine, true, true);
-    totalRegistrationsFailed_++;
-    if (totalRegistrationsFailed_ == trafficPattern_.size())
-      signalHandler();
+    m_nRegistrationsFailed++;
+    if (m_nRegistrationsFailed == m_trafficPatterns.size())
+      {
+        m_hasError = true;
+        signalHandler();
+      }
   }
 
   void
-  initialize()
+  run()
   {
-    boost::asio::signal_set signalSet(*ioService_, SIGINT, SIGTERM);
+    boost::asio::signal_set signalSet(*m_ioService, SIGINT, SIGTERM);
     signalSet.async_wait(boost::bind(&NdnTrafficServer::signalHandler, this));
-    m_logger.initializeLog(instanceId_);
+    m_logger.initializeLog(m_instanceId);
     initializeTrafficConfiguration();
-
-    int patternId;
-    for (patternId=0; patternId<trafficPattern_.size(); patternId++)
+    if (m_nMaximumInterests == 0)
       {
-        face_.setInterestFilter(trafficPattern_[patternId].name,
-                                bind(&NdnTrafficServer::onInterest,
-                                     this, _1, _2,
-                                     patternId),
-                                bind(&NdnTrafficServer::onRegisterFailed,
-                                     this, _1, _2,
-                                     patternId));
+        logStatistics();
+        m_logger.shutdownLogger();
+        return;
+      }
+
+    for (int patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
+      {
+        m_face.setInterestFilter(m_trafficPatterns[patternId].m_name,
+                                 bind(&NdnTrafficServer::onInterest,
+                                      this, _1, _2,
+                                      patternId),
+                                 bind(&NdnTrafficServer::onRegisterFailed,
+                                      this, _1, _2,
+                                      patternId));
       }
 
     try {
-      face_.processEvents();
+      m_face.processEvents();
     }
-    catch(std::exception &e) {
-      m_logger.log("ERROR: "+(std::string)e.what(), true, true);
+    catch (std::exception& e) {
+      m_logger.log("ERROR: " + static_cast<std::string>(e.what()), true, true);
       m_logger.shutdownLogger();
+      m_hasError = true;
+      m_ioService->stop();
     }
   }
 
 private:
-  KeyChain keyChain_;
-  std::string programName_;
-  std::string instanceId_;
-  int contentDelayTime_;
-  int totalRegistrationsFailed_;
+  KeyChain m_keyChain;
+  std::string m_programName;
+  bool m_hasError;
+  std::string m_instanceId;
+  time::milliseconds m_contentDelay;
+  int m_nRegistrationsFailed;
   Logger m_logger;
-  std::string configurationFile_;
-  ptr_lib::shared_ptr<boost::asio::io_service> ioService_;
-  Face face_;
-  std::vector<DataTrafficConfiguration> trafficPattern_;
-  int totalInterestReceived_;
+  std::string m_configurationFile;
+  shared_ptr<boost::asio::io_service> m_ioService;
+  Face m_face;
+  std::vector<DataTrafficConfiguration> m_trafficPatterns;
+  int m_nMaximumInterests;
+  int m_nInterestsReceived;
 };
 
 } // namespace ndn
@@ -433,17 +457,21 @@ private:
 int
 main(int argc, char* argv[])
 {
+  std::srand(std::time(0));
+  ndn::NdnTrafficServer ndnTrafficServer(argv[0]);
   int option;
-  ndn::NdnTrafficServer ndnTrafficServer (argv[0]);
-  while ((option = getopt(argc, argv, "hd:")) != -1) {
+  while ((option = getopt(argc, argv, "hc:d:")) != -1) {
     switch (option) {
-    case 'h'  :
+    case 'h':
       ndnTrafficServer.usage();
       break;
-    case 'd'  :
-      ndnTrafficServer.setContentDelayTime(atoi(optarg));
+    case 'c':
+      ndnTrafficServer.setMaximumInterests(atoi(optarg));
       break;
-    default   :
+    case 'd':
+      ndnTrafficServer.setContentDelay(atoi(optarg));
+      break;
+    default:
       ndnTrafficServer.usage();
       break;
     }
@@ -452,11 +480,14 @@ main(int argc, char* argv[])
   argc -= optind;
   argv += optind;
 
-  if (argv[0] == NULL)
+  if (argv[0] == 0)
     ndnTrafficServer.usage();
 
   ndnTrafficServer.setConfigurationFile(argv[0]);
-  ndnTrafficServer.initialize();
+  ndnTrafficServer.run();
 
-  return 0;
+  if (ndnTrafficServer.hasError())
+    return 1;
+  else
+    return 0;
 }
