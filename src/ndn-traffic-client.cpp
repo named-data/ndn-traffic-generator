@@ -146,14 +146,14 @@ public:
       if (i == detail.length())
         return false;
       i++;
-      while (
-        std::isalnum(detail[i] || allowedCharacters.find(detail[i]) != std::string::npos)
-        && i < detail.length())
+      while ((std::isalnum(detail[i]) ||
+             allowedCharacters.find(detail[i]) != std::string::npos) &&
+             i < detail.length())
         {
           value += detail[i];
           i++;
         }
-      if(parameter == "" || value == "")
+      if (parameter == "" || value == "")
         return false;
       return true;
     }
