@@ -40,6 +40,7 @@ public:
     , m_nMaximumInterests(-1)
     , m_nInterestsSent(0)
     , m_nInterestsReceived(0)
+    , m_nContentInconsistencies(0)
     , m_minimumInterestRoundTripTime(std::numeric_limits<double>::max())
     , m_maximumInterestRoundTripTime(0)
     , m_totalInterestRoundTripTime(0)
@@ -63,8 +64,8 @@ public:
       , m_nonceDuplicationPercentage(-1)
       , m_scope(-1)
       , m_interestLifetime(getDefaultInterestLifetime())
-      , m_nInterestsSent(-1)
-      , m_nInterestsReceived(-1)
+      , m_nInterestsSent(0)
+      , m_nInterestsReceived(0)
       , m_minimumInterestRoundTripTime(std::numeric_limits<double>::max())
       , m_maximumInterestRoundTripTime(0)
       , m_totalInterestRoundTripTime(0)
@@ -553,7 +554,7 @@ public:
       m_trafficPatterns[patternId].m_maximumInterestRoundTripTime = roundTripTime;
     m_totalInterestRoundTripTime += roundTripTime;
     m_trafficPatterns[patternId].m_totalInterestRoundTripTime += roundTripTime;
-    if (m_nMaximumInterests >= 0 && m_nInterestsSent == m_nMaximumInterests)
+    if (m_nMaximumInterests >= 0 && globalReference == m_nMaximumInterests)
       {
         logStatistics();
         m_logger.shutdownLogger();
@@ -574,7 +575,7 @@ public:
     logLine += ", LocalID=" + boost::lexical_cast<std::string>(localReference);
     logLine += ", Name=" + interest.getName().toUri();
     m_logger.log(logLine, true, false);
-    if (m_nMaximumInterests >= 0 && m_nInterestsSent == m_nMaximumInterests)
+    if (m_nMaximumInterests >= 0 && globalReference == m_nMaximumInterests)
       {
         logStatistics();
         m_logger.shutdownLogger();
