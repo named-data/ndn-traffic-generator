@@ -8,18 +8,20 @@
  */
 
 #include <sstream>
+
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/noncopyable.hpp>
 
-#include <ndn-cpp-dev/face.hpp>
-#include <ndn-cpp-dev/security/key-chain.hpp>
+#include <ndn-cxx/face.hpp>
+#include <ndn-cxx/security/key-chain.hpp>
 
 #include "logger.hpp"
 
 namespace ndn {
 
-class NdnTrafficServer
+class NdnTrafficServer : boost::noncopyable
 {
 public:
 
@@ -28,6 +30,7 @@ public:
     : m_logger("NdnTrafficServer")
     , m_programName(programName)
     , m_hasError(false)
+    , m_hasQuietLogging(false)
     , m_nRegistrationsFailed(0)
     , m_nMaximumInterests(-1)
     , m_nInterestsReceived(0)
@@ -162,6 +165,7 @@ public:
       "Set environment variable NDN_TRAFFIC_LOGFOLDER for redirecting output to a log.\n"
       "  [-d interval] - set delay before responding to interest in milliseconds\n"
       "  [-c count]    - specify maximum number of interests to be satisfied\n"
+      "  [-q]          - quiet logging - no interest reception/data generation messages\n"
       "  [-h]          - print help and exit\n\n";
     exit(1);
 
@@ -193,6 +197,12 @@ public:
   setConfigurationFile(char* configurationFile)
   {
     m_configurationFile = configurationFile;
+  }
+
+  void
+  setQuietLogging()
+  {
+    m_hasQuietLogging = true;
   }
 
   void
@@ -368,7 +378,8 @@ public:
         logLine += ", LocalID=" +
           boost::lexical_cast<std::string>(m_trafficPatterns[patternId].m_nInterestsReceived);
         logLine += ", Name=" + m_trafficPatterns[patternId].m_name;
-        m_logger.log(logLine, true, false);
+        if (!m_hasQuietLogging)
+          m_logger.log(logLine, true, false);
         if (m_trafficPatterns[patternId].m_contentDelay > time::milliseconds(-1))
           usleep(m_trafficPatterns[patternId].m_contentDelay.count() * 1000);
         if (m_contentDelay > time::milliseconds(-1))
@@ -440,6 +451,7 @@ private:
   KeyChain m_keyChain;
   std::string m_programName;
   bool m_hasError;
+  bool m_hasQuietLogging;
   std::string m_instanceId;
   time::milliseconds m_contentDelay;
   int m_nRegistrationsFailed;
@@ -460,7 +472,7 @@ main(int argc, char* argv[])
   std::srand(std::time(0));
   ndn::NdnTrafficServer ndnTrafficServer(argv[0]);
   int option;
-  while ((option = getopt(argc, argv, "hc:d:")) != -1) {
+  while ((option = getopt(argc, argv, "hqc:d:")) != -1) {
     switch (option) {
     case 'h':
       ndnTrafficServer.usage();
@@ -470,6 +482,9 @@ main(int argc, char* argv[])
       break;
     case 'd':
       ndnTrafficServer.setContentDelay(atoi(optarg));
+      break;
+    case 'q':
+      ndnTrafficServer.setQuietLogging();
       break;
     default:
       ndnTrafficServer.usage();

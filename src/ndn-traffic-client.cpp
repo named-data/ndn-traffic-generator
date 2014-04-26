@@ -7,25 +7,26 @@
  * Author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  */
 
-#include <string>
-#include <sstream>
 #include <fstream>
+#include <sstream>
+#include <string>
 #include <vector>
+
+#include <boost/asio.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/noncopyable.hpp>
+
+#include <ndn-cxx/exclude.hpp>
+#include <ndn-cxx/face.hpp>
+#include <ndn-cxx/name-component.hpp>
 
 #include "logger.hpp"
 
-#include <boost/asio.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
-
-#include <ndn-cpp-dev/face.hpp>
-#include <ndn-cpp-dev/exclude.hpp>
-#include <ndn-cpp-dev/name-component.hpp>
-
 namespace ndn {
 
-class NdnTrafficClient
+class NdnTrafficClient : boost::noncopyable
 {
 public:
 
@@ -34,6 +35,7 @@ public:
     : m_programName(programName)
     , m_logger("NdnTrafficClient")
     , m_hasError(false)
+    , m_hasQuietLogging(false)
     , m_ioService(new boost::asio::io_service)
     , m_face(m_ioService)
     , m_interestInterval(getDefaultInterestInterval())
@@ -260,6 +262,7 @@ public:
       "  [-i interval] - set interest generation interval in milliseconds (default "
               << getDefaultInterestInterval() << ")\n"
       "  [-c count]    - set total number of interests to be generated\n"
+      "  [-q]          - quiet logging - no interest generation/data reception messages\n"
       "  [-h]          - print help and exit\n\n";
     exit(1);
   }
@@ -290,6 +293,12 @@ public:
   setConfigurationFile(char* configurationFile)
   {
     m_configurationFile = configurationFile;
+  }
+
+  void
+  setQuietLogging()
+  {
+    m_hasQuietLogging = true;
   }
 
   void
@@ -542,7 +551,8 @@ public:
       }
     else
       logLine += ", IsConsistent=NotChecked";
-    m_logger.log(logLine, true, false);
+    if (!m_hasQuietLogging)
+      m_logger.log(logLine, true, false);
     double roundTripTime = (time::steady_clock::now() - sentTime).count() / 1000000.0;
     if (m_minimumInterestRoundTripTime > roundTripTime)
       m_minimumInterestRoundTripTime = roundTripTime;
@@ -709,7 +719,8 @@ public:
                   logLine += ", LocalID=" + boost::lexical_cast<std::string>(
                     m_trafficPatterns[patternId].m_nInterestsSent);
                   logLine += ", Name="+interest.getName().toUri();
-                  m_logger.log(logLine, true, false);
+                  if (!m_hasQuietLogging)
+                    m_logger.log(logLine, true, false);
                   deadlineTimer->expires_at(deadlineTimer->expires_at() +
                                             boost::posix_time::millisec(
                                               m_interestInterval.count()));
@@ -769,6 +780,7 @@ private:
   std::string m_programName;
   std::string m_instanceId;
   bool m_hasError;
+  bool m_hasQuietLogging;
   time::milliseconds m_interestInterval;
   int m_nMaximumInterests;
   Logger m_logger;
@@ -797,7 +809,7 @@ main(int argc, char* argv[])
   std::srand(std::time(0));
   ndn::NdnTrafficClient ndnTrafficClient (argv[0]);
   int option;
-  while ((option = getopt(argc, argv, "hi:c:")) != -1) {
+  while ((option = getopt(argc, argv, "hqi:c:")) != -1) {
     switch (option) {
     case 'h':
       ndnTrafficClient.usage();
@@ -807,6 +819,9 @@ main(int argc, char* argv[])
       break;
     case 'c':
       ndnTrafficClient.setMaximumInterests(atoi(optarg));
+      break;
+    case 'q':
+      ndnTrafficClient.setQuietLogging();
       break;
     default:
       ndnTrafficClient.usage();
