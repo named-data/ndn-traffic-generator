@@ -36,7 +36,6 @@ public:
     , m_logger("NdnTrafficClient")
     , m_hasError(false)
     , m_hasQuietLogging(false)
-    , m_ioService(new boost::asio::io_service)
     , m_face(m_ioService)
     , m_interestInterval(getDefaultInterestInterval())
     , m_nMaximumInterests(-1)
@@ -307,7 +306,7 @@ public:
     logStatistics();
     m_logger.shutdownLogger();
     m_face.shutdown();
-    m_ioService->stop();
+    m_ioService.stop();
     if (m_hasError)
       exit(1);
     else
@@ -569,7 +568,7 @@ public:
         logStatistics();
         m_logger.shutdownLogger();
         m_face.shutdown();
-        m_ioService->stop();
+        m_ioService.stop();
       }
   }
 
@@ -590,7 +589,7 @@ public:
         logStatistics();
         m_logger.shutdownLogger();
         m_face.shutdown();
-        m_ioService->stop();
+        m_ioService.stop();
       }
   }
 
@@ -747,7 +746,7 @@ public:
   void
   run()
   {
-    boost::asio::signal_set signalSet(*m_ioService, SIGINT, SIGTERM);
+    boost::asio::signal_set signalSet(m_ioService, SIGINT, SIGTERM);
     signalSet.async_wait(bind(&NdnTrafficClient::signalHandler, this));
     m_logger.initializeLog(m_instanceId);
     initializeTrafficConfiguration();
@@ -760,7 +759,7 @@ public:
       }
 
     boost::asio::deadline_timer deadlineTimer(
-      *m_ioService,
+      m_ioService,
       boost::posix_time::millisec(m_interestInterval.count()));
     deadlineTimer.async_wait(bind(&NdnTrafficClient::generateTraffic,
                                   this, &deadlineTimer));
@@ -771,7 +770,7 @@ public:
       m_logger.log("ERROR: " + static_cast<std::string>(e.what()), true, true);
       m_logger.shutdownLogger();
       m_hasError = true;
-      m_ioService->stop();
+      m_ioService.stop();
     }
   }
 
@@ -785,7 +784,7 @@ private:
   int m_nMaximumInterests;
   Logger m_logger;
   std::string m_configurationFile;
-  shared_ptr<boost::asio::io_service> m_ioService;
+  boost::asio::io_service m_ioService;
   Face m_face;
   std::vector<InterestTrafficConfiguration> m_trafficPatterns;
   std::vector<uint32_t> m_nonces;
