@@ -36,9 +36,9 @@ public:
     , m_logger("NdnTrafficClient")
     , m_hasError(false)
     , m_hasQuietLogging(false)
-    , m_face(m_ioService)
     , m_interestInterval(getDefaultInterestInterval())
     , m_nMaximumInterests(-1)
+    , m_face(m_ioService)
     , m_nInterestsSent(0)
     , m_nInterestsReceived(0)
     , m_nContentInconsistencies(0)
@@ -777,12 +777,12 @@ public:
 private:
 
   std::string m_programName;
+  Logger m_logger;
   std::string m_instanceId;
   bool m_hasError;
   bool m_hasQuietLogging;
   time::milliseconds m_interestInterval;
   int m_nMaximumInterests;
-  Logger m_logger;
   std::string m_configurationFile;
   boost::asio::io_service m_ioService;
   Face m_face;

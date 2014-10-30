@@ -1,6 +1,6 @@
 .DS*
+.waf3-1*
 .waf-1*
 .lock*
 **/*.pyc
 build/
-

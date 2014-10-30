@@ -3,10 +3,12 @@ VERSION='0.1'
 APPNAME="ndn-traffic-generator"
 
 def options(opt):
-    opt.load('compiler_cxx gnu_dirs')
+    opt.load(['compiler_cxx', 'gnu_dirs'])
+    opt.load(['default-compiler-flags'], tooldir=['.waf-tools'])
 
 def configure(conf):
-    conf.load("compiler_cxx gnu_dirs")
+    conf.load(['compiler_cxx', 'gnu_dirs',
+               'default-compiler-flags'])
     conf.check_cfg(package='libndn-cxx', args=['--cflags', '--libs'],
                    uselib_store='NDN_CXX', mandatory=True)
 

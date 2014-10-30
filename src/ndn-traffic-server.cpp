@@ -414,7 +414,7 @@ public:
   run()
   {
     boost::asio::signal_set signalSet(m_ioService, SIGINT, SIGTERM);
-    signalSet.async_wait(boost::bind(&NdnTrafficServer::signalHandler, this));
+    signalSet.async_wait(bind(&NdnTrafficServer::signalHandler, this));
     m_logger.initializeLog(m_instanceId);
     initializeTrafficConfiguration();
     if (m_nMaximumInterests == 0)
@@ -448,19 +448,20 @@ public:
 
 private:
   KeyChain m_keyChain;
+  Logger m_logger;
   std::string m_programName;
   bool m_hasError;
   bool m_hasQuietLogging;
-  std::string m_instanceId;
-  time::milliseconds m_contentDelay;
   int m_nRegistrationsFailed;
-  Logger m_logger;
+  int m_nMaximumInterests;
+  int m_nInterestsReceived;
+  time::milliseconds m_contentDelay;
+  std::string m_instanceId;
   std::string m_configurationFile;
+
   boost::asio::io_service m_ioService;
   Face m_face;
   std::vector<DataTrafficConfiguration> m_trafficPatterns;
-  int m_nMaximumInterests;
-  int m_nInterestsReceived;
 };
 
 } // namespace ndn
