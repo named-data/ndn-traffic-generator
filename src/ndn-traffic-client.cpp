@@ -1,21 +1,33 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil -*- */
 /**
- * Copyright (C) 2014 University of Arizona.
+ * Copyright (C) 2014-2015  University of Arizona.
  *
- * GNU 3.0 License, see the LICENSE file for more information
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  */
 
+#include <cctype>
+#include <cstdlib>
 #include <fstream>
-#include <sstream>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 #include <boost/asio.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/noncopyable.hpp>
 
 #include <ndn-cxx/exclude.hpp>
@@ -29,11 +41,11 @@ namespace ndn {
 class NdnTrafficClient : boost::noncopyable
 {
 public:
-
   explicit
-  NdnTrafficClient(char* programName)
+  NdnTrafficClient(const char* programName)
     : m_programName(programName)
     , m_logger("NdnTrafficClient")
+    , m_instanceId(std::to_string(std::rand()))
     , m_hasError(false)
     , m_hasQuietLogging(false)
     , m_interestInterval(getDefaultInterestInterval())
@@ -46,7 +58,6 @@ public:
     , m_maximumInterestRoundTripTime(0)
     , m_totalInterestRoundTripTime(0)
   {
-    m_instanceId = boost::lexical_cast<std::string>(std::rand());
   }
 
   class InterestTrafficConfiguration
@@ -74,7 +85,7 @@ public:
     {
     }
 
-    time::milliseconds
+    static time::milliseconds
     getDefaultInterestLifetime()
     {
       return time::milliseconds(-1);
@@ -83,81 +94,74 @@ public:
     void
     printTrafficConfiguration(Logger& logger)
     {
-      std::string detail = "";
+      std::string detail;
+
       if (m_trafficPercentage > 0)
-        detail += "TrafficPercentage=" +
-          boost::lexical_cast<std::string>(m_trafficPercentage) + ", ";
-      if (m_name != "")
+        detail += "TrafficPercentage=" + std::to_string(m_trafficPercentage) + ", ";
+      if (!m_name.empty())
         detail += "Name=" + m_name + ", ";
       if (m_nameAppendBytes > 0)
-        detail += "NameAppendBytes=" + boost::lexical_cast<std::string>(m_nameAppendBytes) + ", ";
+        detail += "NameAppendBytes=" + std::to_string(m_nameAppendBytes) + ", ";
       if (m_nameAppendSequenceNumber > 0)
-        detail += "NameAppendSequenceNumber=" +
-          boost::lexical_cast<std::string>(m_nameAppendSequenceNumber) + ", ";
+        detail += "NameAppendSequenceNumber=" + std::to_string(m_nameAppendSequenceNumber) + ", ";
       if (m_minSuffixComponents >= 0)
-        detail += "MinSuffixComponents=" +
-          boost::lexical_cast<std::string>(m_minSuffixComponents) + ", ";
+        detail += "MinSuffixComponents=" + std::to_string(m_minSuffixComponents) + ", ";
       if (m_maxSuffixComponents >= 0)
-        detail += "MaxSuffixComponents=" +
-          boost::lexical_cast<std::string>(m_maxSuffixComponents) + ", ";
-      if (m_excludeBefore != "")
+        detail += "MaxSuffixComponents=" + std::to_string(m_maxSuffixComponents) + ", ";
+      if (!m_excludeBefore.empty())
         detail += "ExcludeBefore=" + m_excludeBefore + ", ";
-      if (m_excludeAfter != "")
+      if (!m_excludeAfter.empty())
         detail += "ExcludeAfter=" + m_excludeAfter + ", ";
       if (m_excludeBeforeBytes > 0)
-        detail += "ExcludeBeforeBytes=" +
-          boost::lexical_cast<std::string>(m_excludeBeforeBytes) + ", ";
+        detail += "ExcludeBeforeBytes=" + std::to_string(m_excludeBeforeBytes) + ", ";
       if (m_excludeAfterBytes > 0)
-        detail += "ExcludeAfterBytes=" +
-          boost::lexical_cast<std::string>(m_excludeAfterBytes) + ", ";
+        detail += "ExcludeAfterBytes=" + std::to_string(m_excludeAfterBytes) + ", ";
       if (m_childSelector >= 0)
-        detail += "ChildSelector=" +
-          boost::lexical_cast<std::string>(m_childSelector) + ", ";
+        detail += "ChildSelector=" + std::to_string(m_childSelector) + ", ";
       if (m_mustBeFresh >= 0)
-        detail += "MustBeFresh=" +
-          boost::lexical_cast<std::string>(m_mustBeFresh) + ", ";
+        detail += "MustBeFresh=" + std::to_string(m_mustBeFresh) + ", ";
       if (m_nonceDuplicationPercentage > 0)
         detail += "NonceDuplicationPercentage=" +
-          boost::lexical_cast<std::string>(m_nonceDuplicationPercentage) + ", ";
+                  std::to_string(m_nonceDuplicationPercentage) + ", ";
       if (m_scope >= 0)
-        detail += "Scope="+boost::lexical_cast<std::string>(m_scope) + ", ";
+        detail += "Scope=" + std::to_string(m_scope) + ", ";
       if (m_interestLifetime >= time::milliseconds(0))
-        detail += "InterestLifetime=" +
-          boost::lexical_cast<std::string>(m_interestLifetime.count()) + ", ";
-      if (m_expectedContent != "")
+        detail += "InterestLifetime=" + std::to_string(m_interestLifetime.count()) + ", ";
+      if (!m_expectedContent.empty())
         detail += "ExpectedContent=" + m_expectedContent + ", ";
       if (detail.length() >= 2)
-        detail = detail.substr(0, detail.length() - 2); //Removing suffix ", "
+        detail = detail.substr(0, detail.length() - 2); // Removing suffix ", "
+
       logger.log(detail, false, false);
     }
 
     bool
-    extractParameterValue(const std::string& detail,
-                          std::string& parameter,
-                          std::string& value)
+    extractParameterValue(const std::string& detail, std::string& parameter, std::string& value)
     {
       std::string allowedCharacters = ":/+._-%";
+      std::size_t i = 0;
+
       parameter = "";
       value = "";
-      int i = 0;
-      while (detail[i] != '=' && i < detail.length())
-        {
-          parameter += detail[i];
-          i++;
-        }
+      while (detail[i] != '=' && i < detail.length()) {
+        parameter += detail[i];
+        i++;
+      }
       if (i == detail.length())
         return false;
+
       i++;
       while ((std::isalnum(detail[i]) ||
-             allowedCharacters.find(detail[i]) != std::string::npos) &&
-             i < detail.length())
-        {
-          value += detail[i];
-          i++;
-        }
-      if (parameter == "" || value == "")
+              allowedCharacters.find(detail[i]) != std::string::npos) &&
+             i < detail.length()) {
+        value += detail[i];
+        i++;
+      }
+
+      if (parameter.empty() || value.empty())
         return false;
-      return true;
+      else
+        return true;
     }
 
     bool
@@ -167,44 +171,44 @@ public:
       if (extractParameterValue(detail, parameter, value))
         {
           if (parameter == "TrafficPercentage")
-            m_trafficPercentage = boost::lexical_cast<int>(value);
+            m_trafficPercentage = std::stoi(value);
           else if (parameter == "Name")
             m_name = value;
           else if (parameter == "NameAppendBytes")
-            m_nameAppendBytes = boost::lexical_cast<int>(value);
+            m_nameAppendBytes = std::stoi(value);
           else if (parameter == "NameAppendSequenceNumber")
-            m_nameAppendSequenceNumber = boost::lexical_cast<int>(value);
+            m_nameAppendSequenceNumber = std::stoi(value);
           else if (parameter == "MinSuffixComponents")
-            m_minSuffixComponents = boost::lexical_cast<int>(value);
+            m_minSuffixComponents = std::stoi(value);
           else if (parameter == "MaxSuffixComponents")
-            m_maxSuffixComponents = boost::lexical_cast<int>(value);
+            m_maxSuffixComponents = std::stoi(value);
           else if (parameter == "ExcludeBefore")
             m_excludeBefore = value;
           else if (parameter == "ExcludeAfter")
             m_excludeAfter = value;
           else if (parameter == "ExcludeBeforeBytes")
-            m_excludeBeforeBytes = boost::lexical_cast<int>(value);
+            m_excludeBeforeBytes = std::stoi(value);
           else if (parameter == "ExcludeAfterBytes")
-            m_excludeAfterBytes = boost::lexical_cast<int>(value);
+            m_excludeAfterBytes = std::stoi(value);
           else if (parameter == "ChildSelector")
-            m_childSelector = boost::lexical_cast<int>(value);
+            m_childSelector = std::stoi(value);
           else if (parameter == "MustBeFresh")
-            m_mustBeFresh = boost::lexical_cast<int>(value);
+            m_mustBeFresh = std::stoi(value);
           else if (parameter == "NonceDuplicationPercentage")
-            m_nonceDuplicationPercentage = boost::lexical_cast<int>(value);
+            m_nonceDuplicationPercentage = std::stoi(value);
           else if (parameter == "Scope")
-            m_scope = boost::lexical_cast<int>(value);
+            m_scope = std::stoi(value);
           else if (parameter == "InterestLifetime")
-            m_interestLifetime = time::milliseconds(boost::lexical_cast<int>(value));
+            m_interestLifetime = time::milliseconds(std::stoi(value));
           else if (parameter == "ExpectedContent")
             m_expectedContent = value;
           else
-            logger.log("Line " + boost::lexical_cast<std::string>(lineNumber) +
+            logger.log("Line " + std::to_string(lineNumber) +
                        " \t- Invalid Parameter='" + parameter + "'", false, true);
         }
       else
         {
-          logger.log("Line " + boost::lexical_cast<std::string>(lineNumber) +
+          logger.log("Line " + std::to_string(lineNumber) +
                      " \t- Improper Traffic Configuration Line- " + detail, false, true);
           return false;
         }
@@ -217,6 +221,7 @@ public:
       return true;
     }
 
+  private:
     int m_trafficPercentage;
     std::string m_name;
     int m_nameAppendBytes;
@@ -243,6 +248,8 @@ public:
 
     int m_nContentInconsistencies;
     std::string m_expectedContent;
+
+    friend class NdnTrafficClient;
   }; // class InterestTrafficConfiguration
 
   bool
@@ -252,21 +259,25 @@ public:
   }
 
   void
-  usage()
+  usage() const
   {
-    std::cout << "\nUsage: " << m_programName << " [options] <Traffic_Configuration_File>\n"
-      "Generate Interest Traffic as per provided Traffic Configuration File\n"
-      "Interests are continuously generated unless a total number is specified.\n"
-      "Set environment variable NDN_TRAFFIC_LOGFOLDER for redirecting output to a log.\n"
-      "  [-i interval] - set interest generation interval in milliseconds (default "
+    std::cout << "Usage:\n"
+              << "  " << m_programName << " [options] <Traffic_Configuration_File>\n"
+              << "\n"
+              << "Generate Interest traffic as per provided Traffic Configuration File.\n"
+              << "Interests are continuously generated unless a total number is specified.\n"
+              << "Set environment variable NDN_TRAFFIC_LOGFOLDER to redirect output to a log file.\n"
+              << "\n"
+              << "Options:\n"
+              << "  [-i interval] - set interest generation interval in milliseconds (default "
               << getDefaultInterestInterval() << ")\n"
-      "  [-c count]    - set total number of interests to be generated\n"
-      "  [-q]          - quiet logging - no interest generation/data reception messages\n"
-      "  [-h]          - print help and exit\n\n";
-    exit(1);
+              << "  [-c count]    - set total number of interests to be generated\n"
+              << "  [-q]          - quiet mode: no interest reception/data generation logging\n"
+              << "  [-h]          - print this help text and exit\n";
+    exit(EXIT_FAILURE);
   }
 
-  time::milliseconds
+  static time::milliseconds
   getDefaultInterestInterval()
   {
     return time::milliseconds(1000);
@@ -304,13 +315,12 @@ public:
   signalHandler()
   {
     logStatistics();
+
     m_logger.shutdownLogger();
     m_face.shutdown();
     m_ioService.stop();
-    if (m_hasError)
-      exit(1);
-    else
-      exit(0);
+
+    exit(m_hasError ? EXIT_FAILURE : EXIT_SUCCESS);
   }
 
   void
@@ -318,18 +328,19 @@ public:
   {
     m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
     m_logger.log("Total Traffic Pattern Types = " +
-      boost::lexical_cast<std::string>(static_cast<int>(m_trafficPatterns.size())), false, true);
+      std::to_string(m_trafficPatterns.size()), false, true);
     m_logger.log("Total Interests Sent        = " +
-      boost::lexical_cast<std::string>(m_nInterestsSent), false, true);
+      std::to_string(m_nInterestsSent), false, true);
     m_logger.log("Total Responses Received    = " +
-      boost::lexical_cast<std::string>(m_nInterestsReceived), false, true);
+      std::to_string(m_nInterestsReceived), false, true);
+
     double loss = 0;
     if (m_nInterestsSent > 0)
       loss = (m_nInterestsSent - m_nInterestsReceived) * 100.0 / m_nInterestsSent;
-    m_logger.log("Total Interest Loss         = " +
-      boost::lexical_cast<std::string>(loss) + "%", false, true);
+    m_logger.log("Total Interest Loss         = " + std::to_string(loss) + "%", false, true);
     if (m_nContentInconsistencies != 0 || m_nInterestsSent != m_nInterestsReceived)
       m_hasError = true;
+
     double average = 0;
     double inconsistency = 0;
     if (m_nInterestsReceived > 0)
@@ -338,23 +349,21 @@ public:
         inconsistency = m_nContentInconsistencies * 100.0 / m_nInterestsReceived;
       }
     m_logger.log("Total Data Inconsistency    = " +
-      boost::lexical_cast<std::string>(inconsistency) + "%", false, true);
+      std::to_string(inconsistency) + "%", false, true);
     m_logger.log("Total Round Trip Time       = " +
-      boost::lexical_cast<std::string>(m_totalInterestRoundTripTime) + "ms", false, true);
+      std::to_string(m_totalInterestRoundTripTime) + "ms", false, true);
     m_logger.log("Average Round Trip Time     = " +
-      boost::lexical_cast<std::string>(average) + "ms\n", false, true);
+      std::to_string(average) + "ms\n", false, true);
 
-    for (int patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
+    for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
       {
         m_logger.log("Traffic Pattern Type #" +
-          boost::lexical_cast<std::string>(patternId + 1), false, true);
+          std::to_string(patternId + 1), false, true);
         m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
         m_logger.log("Total Interests Sent        = " +
-          boost::lexical_cast<std::string>(
-            m_trafficPatterns[patternId].m_nInterestsSent), false, true);
+          std::to_string(m_trafficPatterns[patternId].m_nInterestsSent), false, true);
         m_logger.log("Total Responses Received    = " +
-          boost::lexical_cast<std::string>(
-            m_trafficPatterns[patternId].m_nInterestsReceived), false, true);
+          std::to_string(m_trafficPatterns[patternId].m_nInterestsReceived), false, true);
         loss = 0;
         if (m_trafficPatterns[patternId].m_nInterestsSent > 0)
           {
@@ -363,8 +372,7 @@ public:
             loss *= 100.0;
             loss /= m_trafficPatterns[patternId].m_nInterestsSent;
           }
-        m_logger.log("Total Interest Loss         = " +
-          boost::lexical_cast<std::string>(loss) + "%", false, true);
+        m_logger.log("Total Interest Loss         = " + std::to_string(loss) + "%", false, true);
         average = 0;
         inconsistency = 0;
         if (m_trafficPatterns[patternId].m_nInterestsReceived > 0)
@@ -372,16 +380,15 @@ public:
             average = (m_trafficPatterns[patternId].m_totalInterestRoundTripTime /
                        m_trafficPatterns[patternId].m_nInterestsReceived);
             inconsistency = m_trafficPatterns[patternId].m_nContentInconsistencies;
-            inconsistency =
-              inconsistency * 100.0 / m_trafficPatterns[patternId].m_nInterestsReceived;
+            inconsistency *= 100.0 / m_trafficPatterns[patternId].m_nInterestsReceived;
           }
         m_logger.log("Total Data Inconsistency    = " +
-          boost::lexical_cast<std::string>(inconsistency) + "%", false, true);
+          std::to_string(inconsistency) + "%", false, true);
         m_logger.log("Total Round Trip Time       = " +
-          boost::lexical_cast<std::string>(
-            m_trafficPatterns[patternId].m_totalInterestRoundTripTime) + "ms", false, true);
+          std::to_string(m_trafficPatterns[patternId].m_totalInterestRoundTripTime) +
+          "ms", false, true);
         m_logger.log("Average Round Trip Time     = " +
-          boost::lexical_cast<std::string>(average) + "ms\n", false, true);
+          std::to_string(average) + "ms\n", false, true);
       }
   }
 
@@ -397,10 +404,10 @@ public:
     std::string patternLine;
     std::ifstream patternFile;
     m_logger.log("Analyzing Traffic Configuration File: " + m_configurationFile, true, true);
+
     patternFile.open(m_configurationFile.c_str());
     if (patternFile.is_open())
       {
-        int patternId = 0;
         int lineNumber = 0;
         while (getline(patternFile, patternLine))
           {
@@ -409,7 +416,6 @@ public:
               {
                 InterestTrafficConfiguration interestData;
                 bool shouldSkipLine = false;
-                patternId++;
                 if (interestData.processConfigurationDetail(patternLine, m_logger, lineNumber))
                   {
                     while (getline(patternFile, patternLine) && std::isalpha(patternLine[0]))
@@ -439,13 +445,13 @@ public:
             m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper- " +
                          m_configurationFile, false, true);
             m_logger.shutdownLogger();
-            exit(1);
+            exit(EXIT_FAILURE);
           }
         m_logger.log("Traffic Configuration File Processing Completed\n", true, false);
-        for (patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
+        for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
           {
             m_logger.log("Traffic Pattern Type #" +
-              boost::lexical_cast<std::string>(patternId + 1), false, false);
+                         std::to_string(patternId + 1), false, false);
             m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
             m_logger.log("", false, false);
           }
@@ -455,7 +461,7 @@ public:
         m_logger.log("ERROR - Unable To Open Traffic Configuration File: " +
                      m_configurationFile, false, true);
         m_logger.shutdownLogger();
-        exit(1);
+        exit(EXIT_FAILURE);
       }
   }
 
@@ -473,7 +479,7 @@ public:
             m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " +
                          m_configurationFile, false, true);
             m_logger.shutdownLogger();
-            exit(1);
+            exit(EXIT_FAILURE);
           }
       }
     else
@@ -481,7 +487,7 @@ public:
         m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " +
                      m_configurationFile, false, true);
         m_logger.shutdownLogger();
-        exit(1);
+        exit(EXIT_FAILURE);
       }
   }
 
@@ -510,10 +516,10 @@ public:
   }
 
   static std::string
-  getRandomByteString(int randomSize)
+  getRandomByteString(std::size_t randomSize)
   {
     std::string randomString;
-    for (int i = 0; i < randomSize; i++)
+    for (std::size_t i = 0; i < randomSize; i++)
       randomString += static_cast<char>(std::rand() % 128);
     return randomString;
   }
@@ -526,15 +532,14 @@ public:
          int patternId,
          time::steady_clock::TimePoint sentTime)
   {
-    std::string logLine =
-      "Data Received      - PatternType=" + boost::lexical_cast<std::string>(patternId+1);
-    logLine += ", GlobalID=" + boost::lexical_cast<std::string>(globalReference);
-    logLine += ", LocalID=" + boost::lexical_cast<std::string>(localReference);
+    std::string logLine = "Data Received      - PatternType=" + std::to_string(patternId + 1);
+    logLine += ", GlobalID=" + std::to_string(globalReference);
+    logLine += ", LocalID=" + std::to_string(localReference);
     logLine += ", Name=" + interest.getName().toUri();
 
     m_nInterestsReceived++;
     m_trafficPatterns[patternId].m_nInterestsReceived++;
-    if (m_trafficPatterns[patternId].m_expectedContent != "")
+    if (!m_trafficPatterns[patternId].m_expectedContent.empty())
       {
         std::string receivedContent = reinterpret_cast<const char*>(data.getContent().value());
         int receivedContentLength = data.getContent().value_size();
@@ -578,10 +583,9 @@ public:
             int localReference,
             int patternId)
   {
-    std::string logLine = "Interest Timed Out - PatternType=" +
-      boost::lexical_cast<std::string>(patternId + 1);
-    logLine += ", GlobalID=" + boost::lexical_cast<std::string>(globalReference);
-    logLine += ", LocalID=" + boost::lexical_cast<std::string>(localReference);
+    std::string logLine = "Interest Timed Out - PatternType=" + std::to_string(patternId + 1);
+    logLine += ", GlobalID=" + std::to_string(globalReference);
+    logLine += ", LocalID=" + std::to_string(localReference);
     logLine += ", Name=" + interest.getName().toUri();
     m_logger.log(logLine, true, false);
     if (m_nMaximumInterests >= 0 && globalReference == m_nMaximumInterests)
@@ -594,13 +598,13 @@ public:
   }
 
   void
-  generateTraffic(boost::asio::deadline_timer* deadlineTimer)
+  generateTraffic(boost::asio::deadline_timer* timer)
   {
     if (m_nMaximumInterests < 0 || m_nInterestsSent < m_nMaximumInterests)
       {
         int trafficKey = std::rand() % 100;
         int cumulativePercentage = 0;
-        int patternId;
+        std::size_t patternId;
         for (patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
           {
             cumulativePercentage += m_trafficPatterns[patternId].m_trafficPercentage;
@@ -613,10 +617,10 @@ public:
                 if (m_trafficPatterns[patternId].m_nameAppendSequenceNumber >= 0)
                   {
                     interestName.append(
-                      boost::lexical_cast<std::string>(
-                        m_trafficPatterns[patternId].m_nameAppendSequenceNumber));
+                      std::to_string(m_trafficPatterns[patternId].m_nameAppendSequenceNumber));
                     m_trafficPatterns[patternId].m_nameAppendSequenceNumber++;
                   }
+
                 Interest interest(interestName);
                 if (m_trafficPatterns[patternId].m_minSuffixComponents >= 0)
                   interest.setMinSuffixComponents(
@@ -624,9 +628,10 @@ public:
                 if (m_trafficPatterns[patternId].m_maxSuffixComponents >= 0)
                   interest.setMaxSuffixComponents(
                     m_trafficPatterns[patternId].m_maxSuffixComponents);
+
                 Exclude exclude;
-                if (m_trafficPatterns[patternId].m_excludeBefore != "" &&
-                    m_trafficPatterns[patternId].m_excludeAfter != "")
+                if (!m_trafficPatterns[patternId].m_excludeBefore.empty() &&
+                    !m_trafficPatterns[patternId].m_excludeAfter.empty())
                   {
                     exclude.excludeRange(
                       name::Component(
@@ -634,13 +639,13 @@ public:
                       name::Component(m_trafficPatterns[patternId].m_excludeBefore));
                     interest.setExclude(exclude);
                   }
-                else if (m_trafficPatterns[patternId].m_excludeBefore != "")
+                else if (!m_trafficPatterns[patternId].m_excludeBefore.empty())
                   {
                     exclude.excludeBefore(
                       name::Component(m_trafficPatterns[patternId].m_excludeBefore));
                     interest.setExclude(exclude);
                   }
-                else if (m_trafficPatterns[patternId].m_excludeAfter != "")
+                else if (!m_trafficPatterns[patternId].m_excludeAfter.empty())
                   {
                     exclude.excludeAfter(
                       name::Component(m_trafficPatterns[patternId].m_excludeAfter));
@@ -711,34 +716,32 @@ public:
                                               this, _1, m_nInterestsSent,
                                               m_trafficPatterns[patternId].m_nInterestsSent,
                                               patternId));
-                  std::string logLine = "";
-                  logLine += "Sending Interest   - PatternType=" +
-                    boost::lexical_cast<std::string>(patternId+1);
-                  logLine += ", GlobalID=" + boost::lexical_cast<std::string>(m_nInterestsSent);
-                  logLine += ", LocalID=" + boost::lexical_cast<std::string>(
-                    m_trafficPatterns[patternId].m_nInterestsSent);
-                  logLine += ", Name="+interest.getName().toUri();
-                  if (!m_hasQuietLogging)
+
+                  if (!m_hasQuietLogging) {
+                    std::string logLine =
+                      "Sending Interest   - PatternType=" + std::to_string(patternId + 1) +
+                      ", GlobalID=" + std::to_string(m_nInterestsSent) +
+                      ", LocalID=" +
+                      std::to_string(m_trafficPatterns[patternId].m_nInterestsSent) +
+                      ", Name=" + interest.getName().toUri();
                     m_logger.log(logLine, true, false);
-                  deadlineTimer->expires_at(deadlineTimer->expires_at() +
-                                            boost::posix_time::millisec(
-                                              m_interestInterval.count()));
-                  deadlineTimer->async_wait(bind(&NdnTrafficClient::generateTraffic,
-                                                 this, deadlineTimer));
+                  }
+
+                  timer->expires_at(timer->expires_at() +
+                                    boost::posix_time::millisec(m_interestInterval.count()));
+                  timer->async_wait(bind(&NdnTrafficClient::generateTraffic, this, timer));
                 }
-                catch (std::exception& e) {
-                  m_logger.log("ERROR: " + static_cast<std::string>(e.what()), true, true);
+                catch (const std::exception& e) {
+                  m_logger.log("ERROR: " + std::string(e.what()), true, true);
                 }
                 break;
               }
           }
         if (patternId == m_trafficPatterns.size())
           {
-            deadlineTimer->expires_at(deadlineTimer->expires_at() +
-                                      boost::posix_time::millisec(
-                                        m_interestInterval.count()));
-            deadlineTimer->async_wait(bind(&NdnTrafficClient::generateTraffic,
-                                           this, deadlineTimer));
+            timer->expires_at(timer->expires_at() +
+                              boost::posix_time::millisec(m_interestInterval.count()));
+            timer->async_wait(bind(&NdnTrafficClient::generateTraffic, this, timer));
           }
       }
   }
@@ -758,16 +761,15 @@ public:
         return;
       }
 
-    boost::asio::deadline_timer deadlineTimer(
-      m_ioService,
+    boost::asio::deadline_timer deadlineTimer(m_ioService,
       boost::posix_time::millisec(m_interestInterval.count()));
-    deadlineTimer.async_wait(bind(&NdnTrafficClient::generateTraffic,
-                                  this, &deadlineTimer));
+    deadlineTimer.async_wait(bind(&NdnTrafficClient::generateTraffic, this, &deadlineTimer));
+
     try {
       m_face.processEvents();
     }
-    catch(std::exception& e) {
-      m_logger.log("ERROR: " + static_cast<std::string>(e.what()), true, true);
+    catch (const std::exception& e) {
+      m_logger.log("ERROR: " + std::string(e.what()), true, true);
       m_logger.shutdownLogger();
       m_hasError = true;
       m_ioService.stop();
@@ -775,7 +777,6 @@ public:
   }
 
 private:
-
   std::string m_programName;
   Logger m_logger;
   std::string m_instanceId;
@@ -797,7 +798,6 @@ private:
   double m_minimumInterestRoundTripTime;
   double m_maximumInterestRoundTripTime;
   double m_totalInterestRoundTripTime;
-
 };
 
 } // namespace ndn
@@ -805,25 +805,26 @@ private:
 int
 main(int argc, char* argv[])
 {
-  std::srand(std::time(0));
-  ndn::NdnTrafficClient ndnTrafficClient (argv[0]);
+  std::srand(std::time(nullptr));
+
+  ndn::NdnTrafficClient client(argv[0]);
   int option;
   while ((option = getopt(argc, argv, "hqi:c:")) != -1) {
     switch (option) {
     case 'h':
-      ndnTrafficClient.usage();
+      client.usage();
       break;
     case 'i':
-      ndnTrafficClient.setInterestInterval(atoi(optarg));
+      client.setInterestInterval(atoi(optarg));
       break;
     case 'c':
-      ndnTrafficClient.setMaximumInterests(atoi(optarg));
+      client.setMaximumInterests(atoi(optarg));
       break;
     case 'q':
-      ndnTrafficClient.setQuietLogging();
+      client.setQuietLogging();
       break;
     default:
-      ndnTrafficClient.usage();
+      client.usage();
       break;
     }
   }
@@ -831,14 +832,11 @@ main(int argc, char* argv[])
   argc -= optind;
   argv += optind;
 
-  if (argv[0] == 0)
-    ndnTrafficClient.usage();
+  if (!argc)
+    client.usage();
 
-  ndnTrafficClient.setConfigurationFile(argv[0]);
-  ndnTrafficClient.run();
+  client.setConfigurationFile(argv[0]);
+  client.run();
 
-  if (ndnTrafficClient.hasError())
-    return 1;
-  else
-    return 0;
+  return client.hasError() ? EXIT_FAILURE : EXIT_SUCCESS;
 }

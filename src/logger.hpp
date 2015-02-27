@@ -1,8 +1,19 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil -*- */
 /**
- * Copyright (C) 2014 University of Arizona.
+ * Copyright (C) 2014-2015  University of Arizona.
  *
- * GNU 3.0 License, see the LICENSE file for more information
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  */
@@ -10,8 +21,10 @@
 #ifndef NTG_LOGGER_HPP
 #define NTG_LOGGER_HPP
 
-#include <string>
+#include <cstdlib>
 #include <fstream>
+#include <string>
+
 #include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -46,7 +59,7 @@ public:
   void
   log(const std::string& logLine, bool printTime, bool printToConsole)
   {
-    if( m_logLocation.length() > 0 )
+    if (m_logLocation.length() > 0)
       {
         if (printTime)
           m_logFile << getTimestamp() << " - ";
@@ -70,11 +83,12 @@ public:
   void
   initializeLog(const std::string& instanceId)
   {
-    char* variableValue = std::getenv("NDN_TRAFFIC_LOGFOLDER");
-    std::string logFilename;
+    const char* envVar = std::getenv("NDN_TRAFFIC_LOGFOLDER");
     m_logLocation = "";
-    if (variableValue != NULL)
-      m_logLocation = variableValue;
+    if (envVar != nullptr)
+      m_logLocation = envVar;
+
+    std::string logFilename;
     if (boost::filesystem::exists(boost::filesystem::path(m_logLocation)))
       {
         if (boost::filesystem::is_directory(boost::filesystem::path(m_logLocation)))
