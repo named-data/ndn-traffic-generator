@@ -33,7 +33,6 @@
 #ChildSelector=NNI [0-1]
 #MustBeFresh=NNI [0-1]
 #NonceDuplicationPercentage=NNI [0-100]
-#Scope=NNI
 #InterestLifetime=NNI [Milliseconds]
 #ExpectedContent=String
 #

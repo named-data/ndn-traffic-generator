@@ -74,7 +74,6 @@ public:
       , m_childSelector(-1)
       , m_mustBeFresh(-1)
       , m_nonceDuplicationPercentage(-1)
-      , m_scope(-1)
       , m_interestLifetime(getDefaultInterestLifetime())
       , m_nInterestsSent(0)
       , m_nInterestsReceived(0)
@@ -123,8 +122,6 @@ public:
       if (m_nonceDuplicationPercentage > 0)
         detail += "NonceDuplicationPercentage=" +
                   std::to_string(m_nonceDuplicationPercentage) + ", ";
-      if (m_scope >= 0)
-        detail += "Scope=" + std::to_string(m_scope) + ", ";
       if (m_interestLifetime >= time::milliseconds(0))
         detail += "InterestLifetime=" + std::to_string(m_interestLifetime.count()) + ", ";
       if (!m_expectedContent.empty())
@@ -196,8 +193,6 @@ public:
             m_mustBeFresh = std::stoi(value);
           else if (parameter == "NonceDuplicationPercentage")
             m_nonceDuplicationPercentage = std::stoi(value);
-          else if (parameter == "Scope")
-            m_scope = std::stoi(value);
           else if (parameter == "InterestLifetime")
             m_interestLifetime = time::milliseconds(std::stoi(value));
           else if (parameter == "ExpectedContent")
@@ -235,7 +230,6 @@ public:
     int m_childSelector;
     int m_mustBeFresh;
     int m_nonceDuplicationPercentage;
-    int m_scope;
     time::milliseconds m_interestLifetime;
     int m_nInterestsSent;
     int m_nInterestsReceived;
@@ -698,8 +692,6 @@ public:
                   }
                 else
                   interest.setNonce(getNewNonce());
-                if (m_trafficPatterns[patternId].m_scope >= 0)
-                  interest.setScope(m_trafficPatterns[patternId].m_scope);
                 if (m_trafficPatterns[patternId].m_interestLifetime >= time::milliseconds(0))
                   interest.setInterestLifetime(m_trafficPatterns[patternId].m_interestLifetime);
 
