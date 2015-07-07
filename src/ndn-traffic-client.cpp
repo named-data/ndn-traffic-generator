@@ -509,13 +509,14 @@ public:
     return randomNonce;
   }
 
-  static std::string
-  getRandomByteString(std::size_t randomSize)
+  static name::Component
+  generateRandomNameComponent(size_t length)
   {
-    std::string randomString;
-    for (std::size_t i = 0; i < randomSize; i++)
-      randomString += static_cast<char>(std::rand() % 128);
-    return randomString;
+    Buffer buffer(length);
+    for (size_t i = 0; i < length; i++) {
+      buffer[i] = static_cast<uint8_t>(std::rand() % 256);
+    }
+    return name::Component(buffer);
   }
 
   void
@@ -607,7 +608,7 @@ public:
                 Name interestName(m_trafficPatterns[patternId].m_name);
                 if (m_trafficPatterns[patternId].m_nameAppendBytes > 0)
                   interestName.append(
-                    getRandomByteString(m_trafficPatterns[patternId].m_nameAppendBytes));
+                    generateRandomNameComponent(m_trafficPatterns[patternId].m_nameAppendBytes));
                 if (m_trafficPatterns[patternId].m_nameAppendSequenceNumber >= 0)
                   {
                     interestName.append(
@@ -649,28 +650,24 @@ public:
                     m_trafficPatterns[patternId].m_excludeAfterBytes > 0)
                   {
                     exclude.excludeRange(
-                      name::Component(
-                        getRandomByteString(
-                          m_trafficPatterns[patternId].m_excludeAfterBytes)),
-                      name::Component(
-                        getRandomByteString(
-                          m_trafficPatterns[patternId].m_excludeBeforeBytes)));
+                      generateRandomNameComponent(
+                        m_trafficPatterns[patternId].m_excludeAfterBytes),
+                      generateRandomNameComponent(
+                        m_trafficPatterns[patternId].m_excludeBeforeBytes));
                     interest.setExclude(exclude);
                   }
                 else if (m_trafficPatterns[patternId].m_excludeBeforeBytes > 0)
                   {
                     exclude.excludeBefore(
-                      name::Component(
-                        getRandomByteString(
-                          m_trafficPatterns[patternId].m_excludeBeforeBytes)));
+                      generateRandomNameComponent(
+                        m_trafficPatterns[patternId].m_excludeBeforeBytes));
                     interest.setExclude(exclude);
                   }
                 else if (m_trafficPatterns[patternId].m_excludeAfterBytes > 0)
                   {
                     exclude.excludeAfter(
-                      name::Component(
-                        getRandomByteString(
-                          m_trafficPatterns[patternId].m_excludeAfterBytes)));
+                      generateRandomNameComponent(
+                        m_trafficPatterns[patternId].m_excludeAfterBytes));
                     interest.setExclude(exclude);
                   }
 
