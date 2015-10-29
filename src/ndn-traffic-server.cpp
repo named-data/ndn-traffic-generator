@@ -32,6 +32,7 @@
 
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
+#include <ndn-cxx/security/signing-helpers.hpp>
 
 #include "logger.hpp"
 
@@ -64,6 +65,7 @@ public:
       , m_contentBytes(-1)
       , m_contentDelay(time::milliseconds(-1))
       , m_nInterestsReceived(0)
+      , m_signWithSha256(false)
     {
     }
 
@@ -85,6 +87,7 @@ public:
         detail += "ContentDelay=" + std::to_string(m_contentDelay.count()) + ", ";
       if (!m_content.empty())
         detail += "Content=" + m_content + ", ";
+      detail += "SignWithSha256=" + std::to_string(m_signWithSha256) + ", ";
       if (detail.length() >= 2)
         detail = detail.substr(0, detail.length() - 2);
 
@@ -126,30 +129,48 @@ public:
                                int lineNumber)
     {
       std::string parameter, value;
-      if (extractParameterValue(detail, parameter, value))
-        {
-          if (parameter == "Name")
-            m_name = value;
-          else if (parameter == "ContentType")
-            m_contentType = std::stoi(value);
-          else if (parameter == "FreshnessPeriod")
-            m_freshnessPeriod = time::milliseconds(std::stoi(value));
-          else if (parameter == "ContentDelay")
-            m_contentDelay = time::milliseconds(std::stoi(value));
-          else if (parameter == "ContentBytes")
-            m_contentBytes = std::stoi(value);
-          else if (parameter == "Content")
-            m_content = value;
-          else
+      if (extractParameterValue(detail, parameter, value)) {
+        if (parameter == "Name") {
+          m_name = value;
+        }
+        else if (parameter == "ContentType") {
+          m_contentType = std::stoi(value);
+        }
+        else if (parameter == "FreshnessPeriod") {
+          m_freshnessPeriod = time::milliseconds(std::stoi(value));
+        }
+        else if (parameter == "ContentDelay") {
+          m_contentDelay = time::milliseconds(std::stoi(value));
+        }
+        else if (parameter == "ContentBytes") {
+          m_contentBytes = std::stoi(value);
+        }
+        else if (parameter == "Content") {
+          m_content = value;
+        }
+        else if (parameter == "SignWithSha256") {
+          if (value == "0") {
+            m_signWithSha256 = false;
+          }
+          else if (value == "1") {
+            m_signWithSha256 = true;
+          }
+          else {
             logger.log("Line " + std::to_string(lineNumber) +
-                       " \t- Invalid Parameter='" + parameter + "'", false, true);
+                       " \t- Invalid SignWithSha256 Value='" + value + "'", false, true);
+          }
         }
-      else
-        {
+        else {
           logger.log("Line " + std::to_string(lineNumber) +
-            " \t- Improper Traffic Configuration Line - " + detail, false, true);
-          return false;
+                     " \t- Invalid Parameter='" + parameter + "'", false, true);
         }
+      }
+      else {
+        logger.log("Line " + std::to_string(lineNumber) +
+                   " \t- Improper Traffic Configuration Line - " + detail, false, true);
+        return false;
+      }
+
       return true;
     }
 
@@ -167,6 +188,7 @@ public:
     time::milliseconds m_contentDelay;
     std::string m_content;
     int m_nInterestsReceived;
+    bool m_signWithSha256;
 
     friend class NdnTrafficServer;
   };
@@ -368,38 +390,47 @@ public:
   void
   onInterest(const Name& name, const Interest& interest, int patternId)
   {
+    auto& pattern = m_trafficPatterns[patternId];
+
     if (m_nMaximumInterests < 0 || m_nInterestsReceived < m_nMaximumInterests)
       {
         Data data(interest.getName());
 
-        if (m_trafficPatterns[patternId].m_contentType >= 0)
-          data.setContentType(m_trafficPatterns[patternId].m_contentType);
+        if (pattern.m_contentType >= 0)
+          data.setContentType(pattern.m_contentType);
 
-        if (m_trafficPatterns[patternId].m_freshnessPeriod >= time::milliseconds(0))
-          data.setFreshnessPeriod(m_trafficPatterns[patternId].m_freshnessPeriod);
+        if (pattern.m_freshnessPeriod >= time::milliseconds(0))
+          data.setFreshnessPeriod(pattern.m_freshnessPeriod);
 
         std::string content;
-        if (m_trafficPatterns[patternId].m_contentBytes >= 0)
-          content = getRandomByteString(m_trafficPatterns[patternId].m_contentBytes);
-        if (!m_trafficPatterns[patternId].m_content.empty())
-          content = m_trafficPatterns[patternId].m_content;
+        if (pattern.m_contentBytes >= 0)
+          content = getRandomByteString(pattern.m_contentBytes);
+        if (!pattern.m_content.empty())
+          content = pattern.m_content;
 
         data.setContent(reinterpret_cast<const uint8_t*>(content.c_str()), content.length());
-        m_keyChain.sign(data);
+
+        if (pattern.m_signWithSha256) {
+          m_keyChain.sign(data, security::signingWithSha256());
+        }
+        else {
+          m_keyChain.sign(data);
+        }
+
         m_nInterestsReceived++;
-        m_trafficPatterns[patternId].m_nInterestsReceived++;
+        pattern.m_nInterestsReceived++;
 
         if (!m_hasQuietLogging) {
           std::string logLine =
             "Interest Received          - PatternType=" + std::to_string(patternId + 1) +
             ", GlobalID=" + std::to_string(m_nInterestsReceived) +
-            ", LocalID=" + std::to_string(m_trafficPatterns[patternId].m_nInterestsReceived) +
-            ", Name=" + m_trafficPatterns[patternId].m_name;
+            ", LocalID=" + std::to_string(pattern.m_nInterestsReceived) +
+            ", Name=" + pattern.m_name;
           m_logger.log(logLine, true, false);
         }
 
-        if (m_trafficPatterns[patternId].m_contentDelay > time::milliseconds(-1))
-          usleep(m_trafficPatterns[patternId].m_contentDelay.count() * 1000);
+        if (pattern.m_contentDelay > time::milliseconds(-1))
+          usleep(pattern.m_contentDelay.count() * 1000);
         if (m_contentDelay > time::milliseconds(-1))
           usleep(m_contentDelay.count() * 1000);
         m_face.put(data);

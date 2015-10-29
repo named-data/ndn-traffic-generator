@@ -12,7 +12,7 @@
 #   (Optional) MEANS OTHERWISE
 # * ALSO PROVIDED ARE VALID VALUES POSSIBLE FOR EACH PARAMETER
 # * NNI STANDS FOR NON-NEGATIVE INTEGER
-# * RANGE OF POSSIBLE VALUES IS SPECIFIED IN [] 
+# * RANGE OF POSSIBLE VALUES IS SPECIFIED IN []
 #
 #
 #(Mandatory)
@@ -25,6 +25,7 @@
 #ContentBytes=NNI [>0]
 #Content=String
 #ContentDelay=NNI [Milliseconds]
+#SignWithSha256=Bool [0:default, 1:Sha256]
 #
 #
 ##########
@@ -34,4 +35,3 @@ Content=AAAAAAAA
 Name=/example/B
 Content=BBBBBBBB
 ##########
-
