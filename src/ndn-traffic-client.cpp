@@ -33,6 +33,7 @@
 #include <ndn-cxx/exclude.hpp>
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/name-component.hpp>
+#include <ndn-cxx/util/backports.hpp>
 
 #include "logger.hpp"
 
@@ -45,7 +46,7 @@ public:
   NdnTrafficClient(const char* programName)
     : m_programName(programName)
     , m_logger("NdnTrafficClient")
-    , m_instanceId(std::to_string(std::rand()))
+    , m_instanceId(to_string(std::rand()))
     , m_hasError(false)
     , m_hasQuietLogging(false)
     , m_interestInterval(getDefaultInterestInterval())
@@ -96,34 +97,33 @@ public:
       std::string detail;
 
       if (m_trafficPercentage > 0)
-        detail += "TrafficPercentage=" + std::to_string(m_trafficPercentage) + ", ";
+        detail += "TrafficPercentage=" + to_string(m_trafficPercentage) + ", ";
       if (!m_name.empty())
         detail += "Name=" + m_name + ", ";
       if (m_nameAppendBytes > 0)
-        detail += "NameAppendBytes=" + std::to_string(m_nameAppendBytes) + ", ";
+        detail += "NameAppendBytes=" + to_string(m_nameAppendBytes) + ", ";
       if (m_nameAppendSequenceNumber > 0)
-        detail += "NameAppendSequenceNumber=" + std::to_string(m_nameAppendSequenceNumber) + ", ";
+        detail += "NameAppendSequenceNumber=" + to_string(m_nameAppendSequenceNumber) + ", ";
       if (m_minSuffixComponents >= 0)
-        detail += "MinSuffixComponents=" + std::to_string(m_minSuffixComponents) + ", ";
+        detail += "MinSuffixComponents=" + to_string(m_minSuffixComponents) + ", ";
       if (m_maxSuffixComponents >= 0)
-        detail += "MaxSuffixComponents=" + std::to_string(m_maxSuffixComponents) + ", ";
+        detail += "MaxSuffixComponents=" + to_string(m_maxSuffixComponents) + ", ";
       if (!m_excludeBefore.empty())
         detail += "ExcludeBefore=" + m_excludeBefore + ", ";
       if (!m_excludeAfter.empty())
         detail += "ExcludeAfter=" + m_excludeAfter + ", ";
       if (m_excludeBeforeBytes > 0)
-        detail += "ExcludeBeforeBytes=" + std::to_string(m_excludeBeforeBytes) + ", ";
+        detail += "ExcludeBeforeBytes=" + to_string(m_excludeBeforeBytes) + ", ";
       if (m_excludeAfterBytes > 0)
-        detail += "ExcludeAfterBytes=" + std::to_string(m_excludeAfterBytes) + ", ";
+        detail += "ExcludeAfterBytes=" + to_string(m_excludeAfterBytes) + ", ";
       if (m_childSelector >= 0)
-        detail += "ChildSelector=" + std::to_string(m_childSelector) + ", ";
+        detail += "ChildSelector=" + to_string(m_childSelector) + ", ";
       if (m_mustBeFresh >= 0)
-        detail += "MustBeFresh=" + std::to_string(m_mustBeFresh) + ", ";
+        detail += "MustBeFresh=" + to_string(m_mustBeFresh) + ", ";
       if (m_nonceDuplicationPercentage > 0)
-        detail += "NonceDuplicationPercentage=" +
-                  std::to_string(m_nonceDuplicationPercentage) + ", ";
+        detail += "NonceDuplicationPercentage=" + to_string(m_nonceDuplicationPercentage) + ", ";
       if (m_interestLifetime >= time::milliseconds(0))
-        detail += "InterestLifetime=" + std::to_string(m_interestLifetime.count()) + ", ";
+        detail += "InterestLifetime=" + to_string(m_interestLifetime.count()) + ", ";
       if (!m_expectedContent.empty())
         detail += "ExpectedContent=" + m_expectedContent + ", ";
       if (detail.length() >= 2)
@@ -198,12 +198,12 @@ public:
           else if (parameter == "ExpectedContent")
             m_expectedContent = value;
           else
-            logger.log("Line " + std::to_string(lineNumber) +
+            logger.log("Line " + to_string(lineNumber) +
                        " \t- Invalid Parameter='" + parameter + "'", false, true);
         }
       else
         {
-          logger.log("Line " + std::to_string(lineNumber) +
+          logger.log("Line " + to_string(lineNumber) +
                      " \t- Improper Traffic Configuration Line- " + detail, false, true);
           return false;
         }
@@ -322,16 +322,16 @@ public:
   {
     m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
     m_logger.log("Total Traffic Pattern Types = " +
-      std::to_string(m_trafficPatterns.size()), false, true);
+      to_string(m_trafficPatterns.size()), false, true);
     m_logger.log("Total Interests Sent        = " +
-      std::to_string(m_nInterestsSent), false, true);
+      to_string(m_nInterestsSent), false, true);
     m_logger.log("Total Responses Received    = " +
-      std::to_string(m_nInterestsReceived), false, true);
+      to_string(m_nInterestsReceived), false, true);
 
     double loss = 0;
     if (m_nInterestsSent > 0)
       loss = (m_nInterestsSent - m_nInterestsReceived) * 100.0 / m_nInterestsSent;
-    m_logger.log("Total Interest Loss         = " + std::to_string(loss) + "%", false, true);
+    m_logger.log("Total Interest Loss         = " + to_string(loss) + "%", false, true);
     if (m_nContentInconsistencies != 0 || m_nInterestsSent != m_nInterestsReceived)
       m_hasError = true;
 
@@ -343,21 +343,21 @@ public:
         inconsistency = m_nContentInconsistencies * 100.0 / m_nInterestsReceived;
       }
     m_logger.log("Total Data Inconsistency    = " +
-      std::to_string(inconsistency) + "%", false, true);
+      to_string(inconsistency) + "%", false, true);
     m_logger.log("Total Round Trip Time       = " +
-      std::to_string(m_totalInterestRoundTripTime) + "ms", false, true);
+      to_string(m_totalInterestRoundTripTime) + "ms", false, true);
     m_logger.log("Average Round Trip Time     = " +
-      std::to_string(average) + "ms\n", false, true);
+      to_string(average) + "ms\n", false, true);
 
     for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
       {
         m_logger.log("Traffic Pattern Type #" +
-          std::to_string(patternId + 1), false, true);
+          to_string(patternId + 1), false, true);
         m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
         m_logger.log("Total Interests Sent        = " +
-          std::to_string(m_trafficPatterns[patternId].m_nInterestsSent), false, true);
+          to_string(m_trafficPatterns[patternId].m_nInterestsSent), false, true);
         m_logger.log("Total Responses Received    = " +
-          std::to_string(m_trafficPatterns[patternId].m_nInterestsReceived), false, true);
+          to_string(m_trafficPatterns[patternId].m_nInterestsReceived), false, true);
         loss = 0;
         if (m_trafficPatterns[patternId].m_nInterestsSent > 0)
           {
@@ -366,7 +366,7 @@ public:
             loss *= 100.0;
             loss /= m_trafficPatterns[patternId].m_nInterestsSent;
           }
-        m_logger.log("Total Interest Loss         = " + std::to_string(loss) + "%", false, true);
+        m_logger.log("Total Interest Loss         = " + to_string(loss) + "%", false, true);
         average = 0;
         inconsistency = 0;
         if (m_trafficPatterns[patternId].m_nInterestsReceived > 0)
@@ -377,12 +377,12 @@ public:
             inconsistency *= 100.0 / m_trafficPatterns[patternId].m_nInterestsReceived;
           }
         m_logger.log("Total Data Inconsistency    = " +
-          std::to_string(inconsistency) + "%", false, true);
+          to_string(inconsistency) + "%", false, true);
         m_logger.log("Total Round Trip Time       = " +
-          std::to_string(m_trafficPatterns[patternId].m_totalInterestRoundTripTime) +
+          to_string(m_trafficPatterns[patternId].m_totalInterestRoundTripTime) +
           "ms", false, true);
         m_logger.log("Average Round Trip Time     = " +
-          std::to_string(average) + "ms\n", false, true);
+          to_string(average) + "ms\n", false, true);
       }
   }
 
@@ -445,7 +445,7 @@ public:
         for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
           {
             m_logger.log("Traffic Pattern Type #" +
-                         std::to_string(patternId + 1), false, false);
+                         to_string(patternId + 1), false, false);
             m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
             m_logger.log("", false, false);
           }
@@ -527,9 +527,9 @@ public:
          int patternId,
          time::steady_clock::TimePoint sentTime)
   {
-    std::string logLine = "Data Received      - PatternType=" + std::to_string(patternId + 1);
-    logLine += ", GlobalID=" + std::to_string(globalReference);
-    logLine += ", LocalID=" + std::to_string(localReference);
+    std::string logLine = "Data Received      - PatternType=" + to_string(patternId + 1);
+    logLine += ", GlobalID=" + to_string(globalReference);
+    logLine += ", LocalID=" + to_string(localReference);
     logLine += ", Name=" + interest.getName().toUri();
 
     m_nInterestsReceived++;
@@ -578,9 +578,9 @@ public:
             int localReference,
             int patternId)
   {
-    std::string logLine = "Interest Timed Out - PatternType=" + std::to_string(patternId + 1);
-    logLine += ", GlobalID=" + std::to_string(globalReference);
-    logLine += ", LocalID=" + std::to_string(localReference);
+    std::string logLine = "Interest Timed Out - PatternType=" + to_string(patternId + 1);
+    logLine += ", GlobalID=" + to_string(globalReference);
+    logLine += ", LocalID=" + to_string(localReference);
     logLine += ", Name=" + interest.getName().toUri();
     m_logger.log(logLine, true, false);
     if (m_nMaximumInterests >= 0 && globalReference == m_nMaximumInterests)
@@ -612,7 +612,7 @@ public:
                 if (m_trafficPatterns[patternId].m_nameAppendSequenceNumber >= 0)
                   {
                     interestName.append(
-                      std::to_string(m_trafficPatterns[patternId].m_nameAppendSequenceNumber));
+                      to_string(m_trafficPatterns[patternId].m_nameAppendSequenceNumber));
                     m_trafficPatterns[patternId].m_nameAppendSequenceNumber++;
                   }
 
@@ -708,10 +708,10 @@ public:
 
                   if (!m_hasQuietLogging) {
                     std::string logLine =
-                      "Sending Interest   - PatternType=" + std::to_string(patternId + 1) +
-                      ", GlobalID=" + std::to_string(m_nInterestsSent) +
+                      "Sending Interest   - PatternType=" + to_string(patternId + 1) +
+                      ", GlobalID=" + to_string(m_nInterestsSent) +
                       ", LocalID=" +
-                      std::to_string(m_trafficPatterns[patternId].m_nInterestsSent) +
+                      to_string(m_trafficPatterns[patternId].m_nInterestsSent) +
                       ", Name=" + interest.getName().toUri();
                     m_logger.log(logLine, true, false);
                   }

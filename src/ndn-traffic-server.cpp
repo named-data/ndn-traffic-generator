@@ -33,6 +33,7 @@
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
 #include <ndn-cxx/security/signing-helpers.hpp>
+#include <ndn-cxx/util/backports.hpp>
 
 #include "logger.hpp"
 
@@ -51,7 +52,7 @@ public:
     , m_nMaximumInterests(-1)
     , m_nInterestsReceived(0)
     , m_contentDelay(time::milliseconds(-1))
-    , m_instanceId(std::to_string(std::rand()))
+    , m_instanceId(to_string(std::rand()))
     , m_face(m_ioService)
   {
   }
@@ -77,17 +78,17 @@ public:
       if (!m_name.empty())
         detail += "Name=" + m_name + ", ";
       if (m_contentType >= 0)
-        detail += "ContentType=" + std::to_string(m_contentType) + ", ";
+        detail += "ContentType=" + to_string(m_contentType) + ", ";
       if (m_freshnessPeriod >= time::milliseconds(0))
         detail += "FreshnessPeriod=" +
-                  std::to_string(static_cast<int>(m_freshnessPeriod.count())) + ", ";
+                  to_string(static_cast<int>(m_freshnessPeriod.count())) + ", ";
       if (m_contentBytes >= 0)
-        detail += "ContentBytes=" + std::to_string(m_contentBytes) + ", ";
+        detail += "ContentBytes=" + to_string(m_contentBytes) + ", ";
       if (m_contentDelay >= time::milliseconds(0))
-        detail += "ContentDelay=" + std::to_string(m_contentDelay.count()) + ", ";
+        detail += "ContentDelay=" + to_string(m_contentDelay.count()) + ", ";
       if (!m_content.empty())
         detail += "Content=" + m_content + ", ";
-      detail += "SignWithSha256=" + std::to_string(m_signWithSha256) + ", ";
+      detail += "SignWithSha256=" + to_string(m_signWithSha256) + ", ";
       if (detail.length() >= 2)
         detail = detail.substr(0, detail.length() - 2);
 
@@ -156,17 +157,17 @@ public:
             m_signWithSha256 = true;
           }
           else {
-            logger.log("Line " + std::to_string(lineNumber) +
+            logger.log("Line " + to_string(lineNumber) +
                        " \t- Invalid SignWithSha256 Value='" + value + "'", false, true);
           }
         }
         else {
-          logger.log("Line " + std::to_string(lineNumber) +
+          logger.log("Line " + to_string(lineNumber) +
                      " \t- Invalid Parameter='" + parameter + "'", false, true);
         }
       }
       else {
-        logger.log("Line " + std::to_string(lineNumber) +
+        logger.log("Line " + to_string(lineNumber) +
                    " \t- Improper Traffic Configuration Line - " + detail, false, true);
         return false;
       }
@@ -262,18 +263,18 @@ public:
   {
     m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
     m_logger.log("Total Traffic Pattern Types = " +
-                 std::to_string(m_trafficPatterns.size()), false, true);
+                 to_string(m_trafficPatterns.size()), false, true);
     m_logger.log("Total Interests Received    = " +
-                 std::to_string(m_nInterestsReceived), false, true);
+                 to_string(m_nInterestsReceived), false, true);
 
     if (m_nInterestsReceived < m_nMaximumInterests)
       m_hasError = true;
 
     for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
       {
-        m_logger.log("\nTraffic Pattern Type #" + std::to_string(patternId + 1), false, true);
+        m_logger.log("\nTraffic Pattern Type #" + to_string(patternId + 1), false, true);
         m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
-        m_logger.log("Total Interests Received    = " + std::to_string(
+        m_logger.log("Total Interests Received    = " + to_string(
                        m_trafficPatterns[patternId].m_nInterestsReceived) + "\n", false, true);
       }
   }
@@ -338,7 +339,7 @@ public:
         for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
           {
             m_logger.log("Traffic Pattern Type #" +
-                         std::to_string(patternId + 1), false, false);
+                         to_string(patternId + 1), false, false);
             m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
             m_logger.log("", false, false);
           }
@@ -422,9 +423,9 @@ public:
 
         if (!m_hasQuietLogging) {
           std::string logLine =
-            "Interest Received          - PatternType=" + std::to_string(patternId + 1) +
-            ", GlobalID=" + std::to_string(m_nInterestsReceived) +
-            ", LocalID=" + std::to_string(pattern.m_nInterestsReceived) +
+            "Interest Received          - PatternType=" + to_string(patternId + 1) +
+            ", GlobalID=" + to_string(m_nInterestsReceived) +
+            ", LocalID=" + to_string(pattern.m_nInterestsReceived) +
             ", Name=" + pattern.m_name;
           m_logger.log(logLine, true, false);
         }
@@ -448,7 +449,7 @@ public:
   onRegisterFailed(const ndn::Name& prefix, const std::string& reason, int patternId)
   {
     std::string logLine;
-    logLine += "Prefix Registration Failed - PatternType=" + std::to_string(patternId + 1);
+    logLine += "Prefix Registration Failed - PatternType=" + to_string(patternId + 1);
     logLine += ", Name=" + m_trafficPatterns[patternId].m_name;
     m_logger.log(logLine, true, true);
 
