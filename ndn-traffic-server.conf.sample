@@ -25,7 +25,7 @@
 #ContentBytes=NNI [>0]
 #Content=String
 #ContentDelay=NNI [Milliseconds]
-#SignWithSha256=Bool [0:default, 1:Sha256]
+#SigningInfo=String [Ex: signing with a default certificate of a default key for the identity: `id:/my-identity`]
 #
 #
 ##########

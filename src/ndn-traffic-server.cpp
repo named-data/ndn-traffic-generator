@@ -32,7 +32,7 @@
 
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
-#include <ndn-cxx/security/signing-helpers.hpp>
+#include <ndn-cxx/security/signing-info.hpp>
 #include <ndn-cxx/util/backports.hpp>
 
 #include "logger.hpp"
@@ -66,33 +66,31 @@ public:
       , m_contentBytes(-1)
       , m_contentDelay(time::milliseconds(-1))
       , m_nInterestsReceived(0)
-      , m_signWithSha256(false)
+      , m_signingInfo()
     {
     }
 
     void
     printTrafficConfiguration(Logger& logger)
     {
-      std::string detail;
+      std::stringstream detail;
 
       if (!m_name.empty())
-        detail += "Name=" + m_name + ", ";
+        detail << "Name=" << m_name << ", ";
       if (m_contentType >= 0)
-        detail += "ContentType=" + to_string(m_contentType) + ", ";
+        detail << "ContentType=" << to_string(m_contentType) << ", ";
       if (m_freshnessPeriod >= time::milliseconds(0))
-        detail += "FreshnessPeriod=" +
-                  to_string(static_cast<int>(m_freshnessPeriod.count())) + ", ";
+        detail << "FreshnessPeriod=" <<
+                  to_string(static_cast<int>(m_freshnessPeriod.count())) << ", ";
       if (m_contentBytes >= 0)
-        detail += "ContentBytes=" + to_string(m_contentBytes) + ", ";
+        detail << "ContentBytes=" << to_string(m_contentBytes) << ", ";
       if (m_contentDelay >= time::milliseconds(0))
-        detail += "ContentDelay=" + to_string(m_contentDelay.count()) + ", ";
+        detail << "ContentDelay=" << to_string(m_contentDelay.count()) << ", ";
       if (!m_content.empty())
-        detail += "Content=" + m_content + ", ";
-      detail += "SignWithSha256=" + to_string(m_signWithSha256) + ", ";
-      if (detail.length() >= 2)
-        detail = detail.substr(0, detail.length() - 2);
+        detail << "Content=" << m_content << ", ";
+      detail << "SigningInfo=" << m_signingInfo;
 
-      logger.log(detail, false, false);
+      logger.log(detail.str(), false, false);
     }
 
     bool
@@ -149,17 +147,8 @@ public:
         else if (parameter == "Content") {
           m_content = value;
         }
-        else if (parameter == "SignWithSha256") {
-          if (value == "0") {
-            m_signWithSha256 = false;
-          }
-          else if (value == "1") {
-            m_signWithSha256 = true;
-          }
-          else {
-            logger.log("Line " + to_string(lineNumber) +
-                       " \t- Invalid SignWithSha256 Value='" + value + "'", false, true);
-          }
+        else if (parameter == "SigningInfo") {
+          m_signingInfo = security::SigningInfo(value);
         }
         else {
           logger.log("Line " + to_string(lineNumber) +
@@ -189,7 +178,7 @@ public:
     time::milliseconds m_contentDelay;
     std::string m_content;
     int m_nInterestsReceived;
-    bool m_signWithSha256;
+    security::SigningInfo m_signingInfo;
 
     friend class NdnTrafficServer;
   };
@@ -410,13 +399,7 @@ public:
           content = pattern.m_content;
 
         data.setContent(reinterpret_cast<const uint8_t*>(content.c_str()), content.length());
-
-        if (pattern.m_signWithSha256) {
-          m_keyChain.sign(data, security::signingWithSha256());
-        }
-        else {
-          m_keyChain.sign(data);
-        }
+        m_keyChain.sign(data, pattern.m_signingInfo);
 
         m_nInterestsReceived++;
         pattern.m_nInterestsReceived++;
