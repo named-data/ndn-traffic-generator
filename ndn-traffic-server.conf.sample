@@ -1,5 +1,5 @@
 #
-#THIS IS A SAMPLE SERVER DATA TRAFFIC CONFIGURATION FILE
+# THIS IS A SAMPLE SERVER DATA TRAFFIC CONFIGURATION FILE
 #
 # * TO BE USED TO CONFIGURE RESPONSE TO INTERESTS
 # * MULTIPLE SERVER PREFIXES CAN BE CONFIGURED FOR BEING HANDLED
@@ -15,17 +15,17 @@
 # * RANGE OF POSSIBLE VALUES IS SPECIFIED IN []
 #
 #
-#(Mandatory)
+# (Mandatory)
 #Name=NDN Name
 #
 #
-#(Optional)
+# (Optional)
 #ContentType=NNI [>=0]
-#FreshnessPeriod=NNI [Milliseconds]
+#FreshnessPeriod=NNI [milliseconds]
 #ContentBytes=NNI [>0]
 #Content=String
-#ContentDelay=NNI [Milliseconds]
-#SigningInfo=String [Ex: signing with a default certificate of a default key for the identity: `id:/my-identity`]
+#ContentDelay=NNI [milliseconds]
+#SigningInfo=String [examples below]
 #
 #
 ##########
@@ -34,4 +34,17 @@ Content=AAAAAAAA
 ##########
 Name=/example/B
 Content=BBBBBBBB
+SigningInfo=id:/my-identity
+##########
+Name=/example/C
+Content=CCCCCCCC
+SigningInfo=key:/my-identity/ksk-1450757659736
+##########
+Name=/example/D
+Content=DDDDDDDD
+SigningInfo=cert:/my-identity/KEY/3%F342%9C%E0R%CE/self/%FD%00%00%01%5EE%92%A8%2A
+##########
+Name=/example/E
+Content=EEEEEEEE
+SigningInfo=id:/localhost/identity/digest-sha256
 ##########
