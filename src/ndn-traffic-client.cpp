@@ -76,6 +76,7 @@ public:
       , m_mustBeFresh(-1)
       , m_nonceDuplicationPercentage(-1)
       , m_interestLifetime(getDefaultInterestLifetime())
+      , m_nextHopFaceId(0)
       , m_nInterestsSent(0)
       , m_nInterestsReceived(0)
       , m_minimumInterestRoundTripTime(std::numeric_limits<double>::max())
@@ -124,6 +125,8 @@ public:
         detail += "NonceDuplicationPercentage=" + to_string(m_nonceDuplicationPercentage) + ", ";
       if (m_interestLifetime >= time::milliseconds(0))
         detail += "InterestLifetime=" + to_string(m_interestLifetime.count()) + ", ";
+      if (m_nextHopFaceId > 0)
+        detail += "NextHopFaceId=" + to_string(m_nextHopFaceId) + ", ";
       if (!m_expectedContent.empty())
         detail += "ExpectedContent=" + m_expectedContent + ", ";
       if (detail.length() >= 2)
@@ -195,6 +198,8 @@ public:
             m_nonceDuplicationPercentage = std::stoi(value);
           else if (parameter == "InterestLifetime")
             m_interestLifetime = time::milliseconds(std::stoi(value));
+          else if (parameter == "NextHopFaceId")
+            m_nextHopFaceId = std::stoi(value);
           else if (parameter == "ExpectedContent")
             m_expectedContent = value;
           else
@@ -231,6 +236,7 @@ public:
     int m_mustBeFresh;
     int m_nonceDuplicationPercentage;
     time::milliseconds m_interestLifetime;
+    uint64_t m_nextHopFaceId;
     int m_nInterestsSent;
     int m_nInterestsReceived;
 
@@ -691,6 +697,11 @@ public:
                   interest.setNonce(getNewNonce());
                 if (m_trafficPatterns[patternId].m_interestLifetime >= time::milliseconds(0))
                   interest.setInterestLifetime(m_trafficPatterns[patternId].m_interestLifetime);
+
+                if (m_trafficPatterns[patternId].m_nextHopFaceId > 0) {
+                  interest.setTag(make_shared<lp::NextHopFaceIdTag>(
+                    m_trafficPatterns[patternId].m_nextHopFaceId));
+                }
 
                 try {
                   m_nInterestsSent++;
