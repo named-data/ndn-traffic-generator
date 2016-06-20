@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil -*- */
 /**
- * Copyright (C) 2014-2015  University of Arizona.
+ * Copyright (C) 2014-2016  The University of Arizona.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -54,6 +54,7 @@ public:
     , m_face(m_ioService)
     , m_nInterestsSent(0)
     , m_nInterestsReceived(0)
+    , m_nNacks(0)
     , m_nContentInconsistencies(0)
     , m_minimumInterestRoundTripTime(std::numeric_limits<double>::max())
     , m_maximumInterestRoundTripTime(0)
@@ -79,6 +80,7 @@ public:
       , m_nextHopFaceId(0)
       , m_nInterestsSent(0)
       , m_nInterestsReceived(0)
+      , m_nNacks(0)
       , m_minimumInterestRoundTripTime(std::numeric_limits<double>::max())
       , m_maximumInterestRoundTripTime(0)
       , m_totalInterestRoundTripTime(0)
@@ -239,6 +241,7 @@ public:
     uint64_t m_nextHopFaceId;
     int m_nInterestsSent;
     int m_nInterestsReceived;
+    int m_nNacks;
 
     //round trip time is stored as milliseconds with fractional
     //sub-millisecond precision
@@ -333,6 +336,8 @@ public:
       to_string(m_nInterestsSent), false, true);
     m_logger.log("Total Responses Received    = " +
       to_string(m_nInterestsReceived), false, true);
+    m_logger.log("Total Nacks Received        = " +
+      to_string(m_nNacks), false, true);
 
     double loss = 0;
     if (m_nInterestsSent > 0)
@@ -364,6 +369,8 @@ public:
           to_string(m_trafficPatterns[patternId].m_nInterestsSent), false, true);
         m_logger.log("Total Responses Received    = " +
           to_string(m_trafficPatterns[patternId].m_nInterestsReceived), false, true);
+        m_logger.log("Total Nacks Received        = " +
+          to_string(m_trafficPatterns[patternId].m_nNacks), false, true);
         loss = 0;
         if (m_trafficPatterns[patternId].m_nInterestsSent > 0)
           {
@@ -527,7 +534,7 @@ public:
 
   void
   onData(const ndn::Interest& interest,
-         ndn::Data& data,
+         const ndn::Data& data,
          int globalReference,
          int localReference,
          int patternId,
@@ -576,6 +583,31 @@ public:
         m_face.shutdown();
         m_ioService.stop();
       }
+  }
+
+  void
+  onNack(const ndn::Interest& interest,
+         const ndn::lp::Nack& nack,
+         int globalReference,
+         int localReference,
+         int patternId)
+  {
+    std::string logLine = "Interest Nack'd    - PatternType=" + to_string(patternId + 1);
+    logLine += ", GlobalID=" + to_string(globalReference);
+    logLine += ", LocalID=" + to_string(localReference);
+    logLine += ", Name=" + interest.getName().toUri();
+    logLine += ", NackReason=" + to_string((int)nack.getReason());
+    m_logger.log(logLine, true, false);
+
+    m_nNacks++;
+    m_trafficPatterns[patternId].m_nNacks++;
+
+    if (m_nMaximumInterests >= 0 && globalReference == m_nMaximumInterests) {
+      logStatistics();
+      m_logger.shutdownLogger();
+      m_face.shutdown();
+      m_ioService.stop();
+    }
   }
 
   void
@@ -712,6 +744,10 @@ public:
                                               this, _1, _2, m_nInterestsSent,
                                               m_trafficPatterns[patternId].m_nInterestsSent,
                                               patternId, sentTime),
+                                         bind(&NdnTrafficClient::onNack,
+                                              this, _1, _2, m_nInterestsSent,
+                                              m_trafficPatterns[patternId].m_nInterestsSent,
+                                              patternId),
                                          bind(&NdnTrafficClient::onTimeout,
                                               this, _1, m_nInterestsSent,
                                               m_trafficPatterns[patternId].m_nInterestsSent,
@@ -791,6 +827,7 @@ private:
   std::vector<uint32_t> m_nonces;
   int m_nInterestsSent;
   int m_nInterestsReceived;
+  int m_nNacks;
   int m_nContentInconsistencies;
 
   //round trip time is stored as milliseconds with fractional
