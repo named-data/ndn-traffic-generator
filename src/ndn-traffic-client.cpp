@@ -115,6 +115,8 @@ public:
         detail += "ExcludeBefore=" + m_excludeBefore + ", ";
       if (!m_excludeAfter.empty())
         detail += "ExcludeAfter=" + m_excludeAfter + ", ";
+      if (!m_excludeRange.empty())
+        detail += "ExcludeRange=" + m_excludeRange + ", ";
       if (m_excludeBeforeBytes > 0)
         detail += "ExcludeBeforeBytes=" + to_string(m_excludeBeforeBytes) + ", ";
       if (m_excludeAfterBytes > 0)
@@ -140,7 +142,7 @@ public:
     bool
     extractParameterValue(const std::string& detail, std::string& parameter, std::string& value)
     {
-      std::string allowedCharacters = ":/+._-%";
+      std::string allowedCharacters = ":/+.,_-%";
       std::size_t i = 0;
 
       parameter = "";
@@ -192,6 +194,8 @@ public:
             m_excludeBeforeBytes = std::stoi(value);
           else if (parameter == "ExcludeAfterBytes")
             m_excludeAfterBytes = std::stoi(value);
+          else if (parameter == "ExcludeRange")
+            m_excludeRange = value;
           else if (parameter == "ChildSelector")
             m_childSelector = std::stoi(value);
           else if (parameter == "MustBeFresh")
@@ -232,6 +236,7 @@ public:
     int m_maxSuffixComponents;
     std::string m_excludeBefore;
     std::string m_excludeAfter;
+    std::string m_excludeRange;
     int m_excludeBeforeBytes;
     int m_excludeAfterBytes;
     int m_childSelector;
@@ -708,6 +713,19 @@ public:
                         m_trafficPatterns[patternId].m_excludeAfterBytes));
                     interest.setExclude(exclude);
                   }
+
+                if (!m_trafficPatterns[patternId].m_excludeRange.empty()) {
+                  auto& range = m_trafficPatterns[patternId].m_excludeRange;
+
+                  if (range.find(",") != std::string::npos) {
+                    std::string after = range.substr(0, range.find(","));
+                    std::string before = range.substr(range.find(",") + 1, std::string::npos);
+                    exclude.clear();
+                    exclude.excludeRange(name::Component::fromEscapedString(after),
+                                         name::Component::fromEscapedString(before));
+                    interest.setExclude(exclude);
+                  }
+                }
 
                 if (m_trafficPatterns[patternId].m_childSelector >= 0)
                   interest.setChildSelector(m_trafficPatterns[patternId].m_childSelector);

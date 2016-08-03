@@ -30,6 +30,7 @@
 #ExcludeAfter=NDN Name Component
 #ExcludeBeforeBytes=NNI [>0]
 #ExcludeAfterBytes=NNI [>0]
+#ExcludeRange=NDN Name Component (After),NDN Name Component (Before)
 #ChildSelector=NNI [0-1]
 #MustBeFresh=NNI [0-1]
 #NonceDuplicationPercentage=NNI [0-100]
