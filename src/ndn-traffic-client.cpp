@@ -33,6 +33,7 @@
 #include <ndn-cxx/exclude.hpp>
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/name-component.hpp>
+#include <ndn-cxx/lp/tags.hpp>
 #include <ndn-cxx/util/backports.hpp>
 
 #include "logger.hpp"
