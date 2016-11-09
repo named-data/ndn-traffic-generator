@@ -286,10 +286,10 @@ public:
     exit(EXIT_FAILURE);
   }
 
-  static time::microseconds
+  static time::milliseconds
   getDefaultInterestInterval()
   {
-    return time::microseconds(1000000);
+    return time::milliseconds(1000);
   }
 
   void
@@ -297,13 +297,12 @@ public:
   {
     if (interestInterval <= 0)
       usage();
-    m_interestInterval = time::microseconds(interestInterval);
+    m_interestInterval = time::milliseconds(interestInterval);
   }
 
   void
   setMaximumInterests(int maximumInterests)
   {
-	  std::cout << "set max: " << maximumInterests << std::endl;
     if (maximumInterests <= 0)
       usage();
     m_nMaximumInterests = maximumInterests;
@@ -529,23 +528,14 @@ public:
     return randomNonce;
   }
 
-  name::Component
+  static name::Component
   generateRandomNameComponent(size_t length)
   {
-//    Buffer buffer(length);
-//    for (size_t i = 0; i < length; i++) {
-//      buffer[i] = static_cast<uint8_t>(std::rand() % 256);
-//    }
-//    return name::Component(buffer);
-//    char *buffer;
-//	  int a;
-//	  traffic_file >> a;
-//
-    std::string str;
-    traffic_file >> str;
-//    buffer = str.c_str();
-    std::cout << "here,"  << str << std::endl;
-    return name::Component(str);
+    Buffer buffer(length);
+    for (size_t i = 0; i < length; i++) {
+      buffer[i] = static_cast<uint8_t>(std::rand() % 256);
+    }
+    return name::Component(buffer);
   }
 
   void
@@ -793,7 +783,7 @@ public:
                   }
 
                   timer->expires_at(timer->expires_at() +
-                                    boost::posix_time::microsec(m_interestInterval.count()));
+                                    boost::posix_time::millisec(m_interestInterval.count()));
                   timer->async_wait(bind(&NdnTrafficClient::generateTraffic, this, timer));
                 }
                 catch (const std::exception& e) {
@@ -805,7 +795,7 @@ public:
         if (patternId == m_trafficPatterns.size())
           {
             timer->expires_at(timer->expires_at() +
-                              boost::posix_time::microsec(m_interestInterval.count()));
+                              boost::posix_time::millisec(m_interestInterval.count()));
             timer->async_wait(bind(&NdnTrafficClient::generateTraffic, this, timer));
           }
       }
@@ -827,7 +817,7 @@ public:
       }
 
     boost::asio::deadline_timer deadlineTimer(m_ioService,
-      boost::posix_time::microsec(m_interestInterval.count()));
+      boost::posix_time::millisec(m_interestInterval.count()));
     deadlineTimer.async_wait(bind(&NdnTrafficClient::generateTraffic, this, &deadlineTimer));
 
     try {
@@ -847,7 +837,7 @@ private:
   std::string m_instanceId;
   bool m_hasError;
   bool m_hasQuietLogging;
-  time::microseconds m_interestInterval;
+  time::milliseconds m_interestInterval;
   int m_nMaximumInterests;
   std::string m_configurationFile;
   boost::asio::io_service m_ioService;
@@ -864,8 +854,6 @@ private:
   double m_minimumInterestRoundTripTime;
   double m_maximumInterestRoundTripTime;
   double m_totalInterestRoundTripTime;
-
-public:std::fstream traffic_file;
 };
 
 } // namespace ndn
@@ -877,10 +865,8 @@ main(int argc, char* argv[])
 
   ndn::NdnTrafficClient client(argv[0]);
   int option;
-  std::cout<<argc<<std::endl;
   while ((option = getopt(argc, argv, "hqi:c:")) != -1) {
-	std::cout<<"option:" << option<<std::endl;
-    switch (char(option)) {
+    switch (option) {
     case 'h':
       client.usage();
       break;
@@ -904,12 +890,6 @@ main(int argc, char* argv[])
 
   if (!argc)
     client.usage();
-
-  client.traffic_file.open("/Users/yogy/ELDA/ndn-traffic-generator/traffic_file.conf", std::ios::in);
-
-  int test;
-  client.traffic_file >> test;
-  printf("test: %d\n", test);
 
   client.setConfigurationFile(argv[0]);
   client.run();
