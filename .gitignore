@@ -8,3 +8,5 @@ build/
 .project
 .cproject
 .settings
+
+conf/
