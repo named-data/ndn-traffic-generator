@@ -340,7 +340,7 @@ main(int argc, char* argv[])
 
   ndn::NdnConsumer client(argv[0]);
   int option;
-  while ((option = getopt(argc, argv, "hqi:c:")) != -1) {
+  while ((option = getopt(argc, argv, "hqi:c:s:")) != -1) {
     switch (char(option)) {
     case 'h':
       client.usage();
