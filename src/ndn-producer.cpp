@@ -90,7 +90,7 @@ public:
   {
 	  m_nInterestsReceived++;
 	  const std::string interestName = interest.getName().toUri();
-	  if (interestName[-1] != '@') {
+	  if (interestName.substr(0,3) != "IFA") {
 	    Name dataName(interestName);
 	    static const std::string content = "NC";
 
