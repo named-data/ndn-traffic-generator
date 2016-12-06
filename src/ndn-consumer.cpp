@@ -243,7 +243,7 @@ public:
   {
     if (m_nMaximumInterests < 0 || m_nInterestsSent < m_nMaximumInterests)
       {
-    	Name interestName("/ndn/app");
+    	Name interestName("/ndn/");
     	interestName.append(generateNameComponent());
     	Interest interest(interestName);
     	try {
