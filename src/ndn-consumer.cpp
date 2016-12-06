@@ -31,6 +31,7 @@ public:
     , m_hasError(false)
     , m_hasQuietLogging(false)
     , m_interestInterval(getDefaultInterestInterval())
+    , m_startTime(0)
     , m_nMaximumInterests(-1)
     , m_face(m_ioService)
     , m_nInterestsSent(0)
@@ -61,6 +62,7 @@ public:
               << "Options:\n"
               << "  [-i interval] - set interest generation interval in microseconds (default "
               << getDefaultInterestInterval() << ")\n"
+			  << "  [-s startTime]- set traffic starting time in microseconds\n"
               << "  [-c count]    - set total number of interests to be generated\n"
               << "  [-q]          - quiet mode: no interest reception/data generation logging\n"
               << "  [-h]          - print this help text and exit\n";
@@ -79,6 +81,14 @@ public:
     if (interestInterval <= 0)
       usage();
     m_interestInterval = time::microseconds(interestInterval);
+  }
+
+  void
+  setStartTime(int startTime)
+  {
+    if (startTime <= 0)
+      usage();
+    m_startTime = time::microseconds(startTime);
   }
 
   void
@@ -284,7 +294,7 @@ public:
       }
 
     boost::asio::deadline_timer deadlineTimer(m_ioService,
-      boost::posix_time::microsec(m_interestInterval.count()));
+      boost::posix_time::microsec(m_startTime.count()));
     deadlineTimer.async_wait(bind(&NdnConsumer::generateTraffic, this, &deadlineTimer));
 
     try {
@@ -305,6 +315,7 @@ private:
   bool m_hasError;
   bool m_hasQuietLogging;
   time::microseconds m_interestInterval;
+  time::microseconds m_startTime;
   int m_nMaximumInterests;
   std::string m_configurationFile;
   std::ifstream m_traffic_file;
@@ -339,6 +350,9 @@ main(int argc, char* argv[])
       break;
     case 'c':
       client.setMaximumInterests(atoi(optarg));
+      break;
+    case 's':
+      client.setStartTime(atoi(optarg));
       break;
     case 'q':
       client.setQuietLogging();
