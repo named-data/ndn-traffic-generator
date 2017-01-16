@@ -1,6 +1,7 @@
 import random 
 import bisect 
 import math 
+import numpy
 
 
 def randZipf(n, alpha, numSamples): 
