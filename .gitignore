@@ -4,3 +4,9 @@
 .lock*
 **/*.pyc
 build/
+
+.project
+.cproject
+.settings
+
+conf/
