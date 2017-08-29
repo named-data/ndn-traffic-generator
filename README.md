@@ -11,32 +11,12 @@ to configure various parameters.
 
 Compiling and running ndn-traffic-generator requires the following dependencies:
 
-1. C++ Boost Libraries version >= 1.48 <http://www.boost.org>
+1. ndn-cxx library <https://github.com/named-data/ndn-cxx>
 
-    On Ubuntu 12.04:
+    For detailed installation instructions, please see
+    [`INSTALL.rst`](https://github.com/named-data/ndn-cxx/blob/master/docs/INSTALL.rst)
 
-        sudo apt-get install libboost1.48-all-dev
-
-    On Ubuntu 13.10 and later
-
-        sudo apt-get install libboost-all-dev
-
-    On OSX with macports
-
-        sudo port install boost
-
-    On OSX with brew
-
-        brew install boost
-
-On other platforms Boost Libraries can be installed from the packaged version for the
-distribution, if the version matches requirements, or compiled from source
-
-2. ndn-cxx library <https://github.com/named-data/ndn-cxx>
-
-    For detailed installation instructions, please refer README file
-
-3. NDN forwarding daemon <https://github.com/named-data/NFD>
+2. NDN forwarding daemon <https://github.com/named-data/NFD>
 
 -----------------------------------------------------
 
