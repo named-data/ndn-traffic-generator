@@ -1,5 +1,7 @@
-Traffic Generator For NDN (ndn-traffic-generator)
+Traffic Generator for NDN (ndn-traffic-generator)
 =================================================
+
+[![Build Status](https://travis-ci.org/named-data/ndn-traffic-generator.svg?branch=master)](https://travis-ci.org/named-data/ndn-traffic-generator)
 
 This tool is designed to generate Interest and Data traffic in an NDN network.
 The client and server tool accept traffic configuration files which can be
@@ -20,11 +22,12 @@ Compiling and running ndn-traffic-generator requires the following dependencies:
 
 -----------------------------------------------------
 
-## 1. Compile & Installation Instructions: ##
+## 1. Compilation & Installation Instructions: ##
 
     ./waf configure
     ./waf
     sudo ./waf install
+
 
 ## 2. Tool Run Instructions & Command Line Options: ##
 
@@ -51,17 +54,17 @@ Compiling and running ndn-traffic-generator requires the following dependencies:
 
 __ON MACHINE #1__
 
-(NDN forwarding daemon should be running)
+(NFD must be running)
 
-Start traffic server
+Start traffic server:
 
         ndn-traffic-server ndn-traffic-server.conf
 
 __ON MACHINE #2__
 
-(NDN forwarding daemon should be running)
+(NFD must be running)
 
-Start the traffic client
+Start the traffic client:
 
         ndn-traffic ndn-traffic-client.conf
 
