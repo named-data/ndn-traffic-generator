@@ -92,7 +92,9 @@ matrix:
       dist: trusty
       addons:
         apt:
-          sources: llvm-toolchain-trusty-3.9
+          sources:
+            - llvm-toolchain-trusty-3.9
+            - ubuntu-toolchain-r-test
           packages: clang-3.9
       env:
         - CXX=clang++-3.9
@@ -101,10 +103,23 @@ matrix:
       dist: trusty
       addons:
         apt:
-          sources: llvm-toolchain-trusty-4.0
+          sources:
+            - llvm-toolchain-trusty-4.0
+            - ubuntu-toolchain-r-test
           packages: clang-4.0
       env:
         - CXX=clang++-4.0
+        - NODE_LABELS="Linux Ubuntu Ubuntu-14.04"
+    - os: linux
+      dist: trusty
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-trusty-5.0
+            - ubuntu-toolchain-r-test
+          packages: clang-5.0
+      env:
+        - CXX=clang++-5.0
         - NODE_LABELS="Linux Ubuntu Ubuntu-14.04"
 
     # macOS/clang
@@ -119,6 +134,10 @@ matrix:
         - NODE_LABELS="OSX OSX-10.11"
     - os: osx
       osx_image: xcode8.3
+      env:
+        - NODE_LABELS="OSX OSX-10.12"
+    - os: osx
+      osx_image: xcode9
       env:
         - NODE_LABELS="OSX OSX-10.12"
 
