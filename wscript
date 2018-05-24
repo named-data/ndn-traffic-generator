@@ -20,6 +20,8 @@ def configure(conf):
     conf.check_cfg(package='libndn-cxx', args=['--cflags', '--libs'],
                    uselib_store='NDN_CXX', mandatory=True)
 
+    conf.check_compiler_flags()
+
 def build(bld):
     bld.program(
         target='ndn-traffic',
