@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil -*- */
-/**
- * Copyright (C) 2014-2015  University of Arizona.
+/*
+ * Copyright (C) 2014-2018  Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,24 +18,25 @@
  * Author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  */
 
-#include <cctype>
-#include <cstdlib>
-#include <fstream>
-#include <string>
-#include <unistd.h>
-#include <vector>
+#include "logger.hpp"
+
+#include <ndn-cxx/face.hpp>
+#include <ndn-cxx/security/key-chain.hpp>
+#include <ndn-cxx/security/signing-info.hpp>
+#include <ndn-cxx/util/backports.hpp>
+#include <ndn-cxx/util/scheduler.hpp>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/noncopyable.hpp>
 
-#include <ndn-cxx/face.hpp>
-#include <ndn-cxx/security/key-chain.hpp>
-#include <ndn-cxx/security/signing-info.hpp>
-#include <ndn-cxx/util/backports.hpp>
-
-#include "logger.hpp"
+#include <cctype>
+#include <cstdlib>
+#include <fstream>
+#include <string>
+#include <unistd.h>
+#include <vector>
 
 namespace ndn {
 
@@ -54,6 +55,7 @@ public:
     , m_contentDelay(time::milliseconds(-1))
     , m_instanceId(to_string(std::rand()))
     , m_face(m_ioService)
+    , m_scheduler(m_ioService)
   {
   }
 
@@ -75,19 +77,25 @@ public:
     {
       std::stringstream detail;
 
-      if (!m_name.empty())
+      if (!m_name.empty()) {
         detail << "Name=" << m_name << ", ";
-      if (m_contentType >= 0)
+      }
+      if (m_contentType >= 0) {
         detail << "ContentType=" << to_string(m_contentType) << ", ";
-      if (m_freshnessPeriod >= time::milliseconds(0))
+      }
+      if (m_freshnessPeriod >= time::milliseconds(0)) {
         detail << "FreshnessPeriod=" <<
                   to_string(static_cast<int>(m_freshnessPeriod.count())) << ", ";
-      if (m_contentBytes >= 0)
+      }
+      if (m_contentBytes >= 0) {
         detail << "ContentBytes=" << to_string(m_contentBytes) << ", ";
-      if (m_contentDelay >= time::milliseconds(0))
+      }
+      if (m_contentDelay >= time::milliseconds(0)) {
         detail << "ContentDelay=" << to_string(m_contentDelay.count()) << ", ";
-      if (!m_content.empty())
+      }
+      if (!m_content.empty()) {
         detail << "Content=" << m_content << ", ";
+      }
       detail << "SigningInfo=" << m_signingInfo;
 
       logger.log(detail.str(), false, false);
@@ -204,8 +212,9 @@ public:
   void
   setMaximumInterests(int maximumInterests)
   {
-    if (maximumInterests < 0)
+    if (maximumInterests < 0) {
       usage();
+    }
     m_nMaximumInterests = maximumInterests;
   }
 
@@ -218,8 +227,9 @@ public:
   void
   setContentDelay(int contentDelay)
   {
-    if (contentDelay < 0)
+    if (contentDelay < 0) {
       usage();
+    }
     m_contentDelay = time::milliseconds(contentDelay);
   }
 
@@ -256,16 +266,16 @@ public:
     m_logger.log("Total Interests Received    = " +
                  to_string(m_nInterestsReceived), false, true);
 
-    if (m_nInterestsReceived < m_nMaximumInterests)
+    if (m_nInterestsReceived < m_nMaximumInterests) {
       m_hasError = true;
+    }
 
-    for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
-      {
-        m_logger.log("\nTraffic Pattern Type #" + to_string(patternId + 1), false, true);
-        m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
-        m_logger.log("Total Interests Received    = " + to_string(
-                       m_trafficPatterns[patternId].m_nInterestsReceived) + "\n", false, true);
-      }
+    for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
+      m_logger.log("\nTraffic Pattern Type #" + to_string(patternId + 1), false, true);
+      m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
+      m_logger.log("Total Interests Received    = " + to_string(
+                     m_trafficPatterns[patternId].m_nInterestsReceived) + "\n", false, true);
+    }
   }
 
   bool
@@ -282,98 +292,87 @@ public:
     m_logger.log("Analyzing Traffic Configuration File: " + m_configurationFile, true, true);
 
     patternFile.open(m_configurationFile.c_str());
-    if (patternFile.is_open())
-      {
-        int lineNumber = 0;
-        while (getline(patternFile, patternLine))
-          {
-            lineNumber++;
-            if (std::isalpha(patternLine[0]))
-              {
-                DataTrafficConfiguration dataData;
-                bool shouldSkipLine = false;
-                if (dataData.processConfigurationDetail(patternLine, m_logger, lineNumber))
-                  {
-                    while (getline(patternFile, patternLine) && std::isalpha(patternLine[0]))
-                      {
-                        lineNumber++;
-                        if (!dataData.processConfigurationDetail(patternLine, m_logger, lineNumber))
-                          {
-                            shouldSkipLine = true;
-                            break;
-                          }
-                      }
-                    lineNumber++;
-                  }
-                else
-                  shouldSkipLine = true;
-                if (!shouldSkipLine)
-                  {
-                    if (dataData.checkTrafficDetailCorrectness())
-                      m_trafficPatterns.push_back(dataData);
-                  }
+    if (patternFile.is_open()) {
+      int lineNumber = 0;
+      while (getline(patternFile, patternLine)) {
+        lineNumber++;
+        if (std::isalpha(patternLine[0])) {
+          DataTrafficConfiguration dataData;
+          bool shouldSkipLine = false;
+          if (dataData.processConfigurationDetail(patternLine, m_logger, lineNumber)) {
+            while (getline(patternFile, patternLine) && std::isalpha(patternLine[0])) {
+              lineNumber++;
+              if (!dataData.processConfigurationDetail(patternLine, m_logger, lineNumber)) {
+                shouldSkipLine = true;
+                break;
               }
+            }
+            lineNumber++;
           }
-        patternFile.close();
-
-        if (!checkTrafficPatternCorrectness())
-          {
-            m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper - " +
-                         m_configurationFile, false, true);
-            m_logger.shutdownLogger();
-            exit(EXIT_FAILURE);
+          else {
+            shouldSkipLine = true;
           }
-
-        m_logger.log("Traffic Configuration File Processing Completed\n", true, false);
-        for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
-          {
-            m_logger.log("Traffic Pattern Type #" +
-                         to_string(patternId + 1), false, false);
-            m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
-            m_logger.log("", false, false);
+          if (!shouldSkipLine) {
+            if (dataData.checkTrafficDetailCorrectness()) {
+              m_trafficPatterns.push_back(dataData);
+            }
           }
+        }
       }
-    else
-      {
-        m_logger.log("ERROR - Unable To Open Traffic Configuration File: " +
-          m_configurationFile, false, true);
+      patternFile.close();
+
+      if (!checkTrafficPatternCorrectness()) {
+        m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper - " +
+                     m_configurationFile, false, true);
         m_logger.shutdownLogger();
         exit(EXIT_FAILURE);
       }
+
+      m_logger.log("Traffic Configuration File Processing Completed\n", true, false);
+      for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
+        m_logger.log("Traffic Pattern Type #" +
+                     to_string(patternId + 1), false, false);
+        m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
+        m_logger.log("", false, false);
+      }
+    }
+    else {
+      m_logger.log("ERROR - Unable To Open Traffic Configuration File: " +
+        m_configurationFile, false, true);
+      m_logger.shutdownLogger();
+      exit(EXIT_FAILURE);
+    }
   }
 
   void
   initializeTrafficConfiguration()
   {
-    if (boost::filesystem::exists(boost::filesystem::path(m_configurationFile)))
-      {
-        if (boost::filesystem::is_regular_file(boost::filesystem::path(m_configurationFile)))
-          {
-            parseConfigurationFile();
-          }
-        else
-          {
-            m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " +
-              m_configurationFile, false, true);
-            m_logger.shutdownLogger();
-            exit(EXIT_FAILURE);
-          }
+    if (boost::filesystem::exists(boost::filesystem::path(m_configurationFile))) {
+      if (boost::filesystem::is_regular_file(boost::filesystem::path(m_configurationFile))) {
+        parseConfigurationFile();
       }
-    else
-      {
-        m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " +
-          m_configurationFile, false, true);
+      else {
+        m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " +
+                     m_configurationFile, false, true);
         m_logger.shutdownLogger();
         exit(EXIT_FAILURE);
       }
+    }
+    else {
+      m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " +
+                   m_configurationFile, false, true);
+      m_logger.shutdownLogger();
+      exit(EXIT_FAILURE);
+    }
   }
 
   static std::string
   getRandomByteString(std::size_t randomSize)
   {
     std::string randomString;
-    for (std::size_t i = 0; i < randomSize; i++)
+    for (std::size_t i = 0; i < randomSize; i++) {
       randomString += static_cast<char>(std::rand() % 128);
+    }
     return randomString;
   }
 
@@ -382,50 +381,50 @@ public:
   {
     auto& pattern = m_trafficPatterns[patternId];
 
-    if (m_nMaximumInterests < 0 || m_nInterestsReceived < m_nMaximumInterests)
-      {
-        Data data(interest.getName());
+    if (m_nMaximumInterests < 0 || m_nInterestsReceived < m_nMaximumInterests) {
+      Data data(interest.getName());
 
-        if (pattern.m_contentType >= 0)
-          data.setContentType(pattern.m_contentType);
+      if (pattern.m_contentType >= 0)
+        data.setContentType(pattern.m_contentType);
 
-        if (pattern.m_freshnessPeriod >= time::milliseconds(0))
-          data.setFreshnessPeriod(pattern.m_freshnessPeriod);
+      if (pattern.m_freshnessPeriod >= time::milliseconds(0))
+        data.setFreshnessPeriod(pattern.m_freshnessPeriod);
 
-        std::string content;
-        if (pattern.m_contentBytes >= 0)
-          content = getRandomByteString(pattern.m_contentBytes);
-        if (!pattern.m_content.empty())
-          content = pattern.m_content;
+      std::string content;
+      if (pattern.m_contentBytes >= 0)
+        content = getRandomByteString(pattern.m_contentBytes);
+      if (!pattern.m_content.empty())
+        content = pattern.m_content;
 
-        data.setContent(reinterpret_cast<const uint8_t*>(content.c_str()), content.length());
-        m_keyChain.sign(data, pattern.m_signingInfo);
+      data.setContent(reinterpret_cast<const uint8_t*>(content.c_str()), content.length());
+      m_keyChain.sign(data, pattern.m_signingInfo);
 
-        m_nInterestsReceived++;
-        pattern.m_nInterestsReceived++;
+      m_nInterestsReceived++;
+      pattern.m_nInterestsReceived++;
 
-        if (!m_hasQuietLogging) {
-          std::string logLine =
-            "Interest Received          - PatternType=" + to_string(patternId + 1) +
-            ", GlobalID=" + to_string(m_nInterestsReceived) +
-            ", LocalID=" + to_string(pattern.m_nInterestsReceived) +
-            ", Name=" + pattern.m_name;
-          m_logger.log(logLine, true, false);
-        }
-
-        if (pattern.m_contentDelay > time::milliseconds(-1))
-          usleep(pattern.m_contentDelay.count() * 1000);
-        if (m_contentDelay > time::milliseconds(-1))
-          usleep(m_contentDelay.count() * 1000);
-        m_face.put(data);
+      if (!m_hasQuietLogging) {
+        std::string logLine =
+          "Interest Received          - PatternType=" + to_string(patternId + 1) +
+          ", GlobalID=" + to_string(m_nInterestsReceived) +
+          ", LocalID=" + to_string(pattern.m_nInterestsReceived) +
+          ", Name=" + pattern.m_name;
+        m_logger.log(logLine, true, false);
       }
-    if (m_nMaximumInterests >= 0 && m_nInterestsReceived == m_nMaximumInterests)
-      {
-        logStatistics();
-        m_logger.shutdownLogger();
-        m_face.shutdown();
-        m_ioService.stop();
-      }
+
+      if (pattern.m_contentDelay > time::milliseconds(-1))
+        usleep(pattern.m_contentDelay.count() * 1000);
+      if (m_contentDelay > time::milliseconds(-1))
+        usleep(m_contentDelay.count() * 1000);
+      m_face.put(data);
+    }
+    if (m_nMaximumInterests >= 0 && m_nInterestsReceived == m_nMaximumInterests) {
+      logStatistics();
+      m_scheduler.scheduleEvent(2_s, [this] {
+          m_logger.shutdownLogger();
+          m_face.shutdown();
+          m_ioService.stop();
+        });
+    }
   }
 
   void
@@ -437,11 +436,10 @@ public:
     m_logger.log(logLine, true, true);
 
     m_nRegistrationsFailed++;
-    if (m_nRegistrationsFailed == m_trafficPatterns.size())
-      {
-        m_hasError = true;
-        signalHandler();
-      }
+    if (m_nRegistrationsFailed == m_trafficPatterns.size()) {
+      m_hasError = true;
+      signalHandler();
+    }
   }
 
   void
@@ -452,17 +450,17 @@ public:
 
     m_logger.initializeLog(m_instanceId);
     initializeTrafficConfiguration();
-    if (m_nMaximumInterests == 0)
-      {
-        logStatistics();
-        m_logger.shutdownLogger();
-        return;
-      }
+    if (m_nMaximumInterests == 0) {
+      logStatistics();
+      m_logger.shutdownLogger();
+      return;
+    }
 
-    for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++)
+    for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
       m_face.setInterestFilter(m_trafficPatterns[patternId].m_name,
                                bind(&NdnTrafficServer::onInterest, this, _1, _2, patternId),
                                bind(&NdnTrafficServer::onRegisterFailed, this, _1, _2, patternId));
+    }
 
     try {
       m_face.processEvents();
@@ -490,6 +488,7 @@ private:
 
   boost::asio::io_service m_ioService;
   Face m_face;
+  util::scheduler::Scheduler m_scheduler;
   std::vector<DataTrafficConfiguration> m_trafficPatterns;
 };
 
@@ -525,8 +524,9 @@ main(int argc, char* argv[])
   argc -= optind;
   argv += optind;
 
-  if (!argc)
+  if (!argc) {
     server.usage();
+  }
 
   server.setConfigurationFile(argv[0]);
   server.run();
