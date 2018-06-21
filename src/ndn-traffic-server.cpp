@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil -*- */
 /*
- * Copyright (C) 2014-2018  Arizona Board of Regents.
+ * Copyright (c) 2014-2018  Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -250,7 +250,6 @@ public:
   {
     logStatistics();
 
-    m_logger.shutdownLogger();
     m_face.shutdown();
     m_ioService.stop();
 
@@ -324,7 +323,6 @@ public:
       if (!checkTrafficPatternCorrectness()) {
         m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper - " +
                      m_configurationFile, false, true);
-        m_logger.shutdownLogger();
         exit(EXIT_FAILURE);
       }
 
@@ -339,7 +337,6 @@ public:
     else {
       m_logger.log("ERROR - Unable To Open Traffic Configuration File: " +
         m_configurationFile, false, true);
-      m_logger.shutdownLogger();
       exit(EXIT_FAILURE);
     }
   }
@@ -354,14 +351,12 @@ public:
       else {
         m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " +
                      m_configurationFile, false, true);
-        m_logger.shutdownLogger();
         exit(EXIT_FAILURE);
       }
     }
     else {
       m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " +
                    m_configurationFile, false, true);
-      m_logger.shutdownLogger();
       exit(EXIT_FAILURE);
     }
   }
@@ -419,11 +414,9 @@ public:
     }
     if (m_nMaximumInterests >= 0 && m_nInterestsReceived == m_nMaximumInterests) {
       logStatistics();
-      m_scheduler.scheduleEvent(2_s, [this] {
-          m_logger.shutdownLogger();
-          m_face.shutdown();
-          m_ioService.stop();
-        });
+      for (auto registeredPrefix : m_registeredPrefixes) {
+        m_face.unsetInterestFilter(registeredPrefix);
+      }
     }
   }
 
@@ -452,14 +445,14 @@ public:
     initializeTrafficConfiguration();
     if (m_nMaximumInterests == 0) {
       logStatistics();
-      m_logger.shutdownLogger();
       return;
     }
 
     for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
-      m_face.setInterestFilter(m_trafficPatterns[patternId].m_name,
-                               bind(&NdnTrafficServer::onInterest, this, _1, _2, patternId),
-                               bind(&NdnTrafficServer::onRegisterFailed, this, _1, _2, patternId));
+      m_registeredPrefixes.push_back(
+        m_face.setInterestFilter(m_trafficPatterns[patternId].m_name,
+                                 bind(&NdnTrafficServer::onInterest, this, _1, _2, patternId),
+                                 bind(&NdnTrafficServer::onRegisterFailed, this, _1, _2, patternId)));
     }
 
     try {
@@ -467,7 +460,6 @@ public:
     }
     catch (const std::exception& e) {
       m_logger.log("ERROR: " + std::string(e.what()), true, true);
-      m_logger.shutdownLogger();
       m_hasError = true;
       m_ioService.stop();
     }
@@ -490,6 +482,7 @@ private:
   Face m_face;
   util::scheduler::Scheduler m_scheduler;
   std::vector<DataTrafficConfiguration> m_trafficPatterns;
+  std::vector<const RegisteredPrefixId*> m_registeredPrefixes;
 };
 
 } // namespace ndn
