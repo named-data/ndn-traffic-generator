@@ -24,7 +24,6 @@
 #include <ndn-cxx/security/key-chain.hpp>
 #include <ndn-cxx/security/signing-info.hpp>
 #include <ndn-cxx/util/backports.hpp>
-#include <ndn-cxx/util/scheduler.hpp>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/signal_set.hpp>
@@ -55,7 +54,7 @@ public:
     , m_contentDelay(time::milliseconds(-1))
     , m_instanceId(to_string(std::rand()))
     , m_face(m_ioService)
-    , m_scheduler(m_ioService)
+    , m_signalSet(m_ioService, SIGINT, SIGTERM)
   {
   }
 
@@ -417,6 +416,7 @@ public:
       for (auto registeredPrefix : m_registeredPrefixes) {
         m_face.unsetInterestFilter(registeredPrefix);
       }
+      m_signalSet.cancel();
     }
   }
 
@@ -438,8 +438,7 @@ public:
   void
   run()
   {
-    boost::asio::signal_set signalSet(m_ioService, SIGINT, SIGTERM);
-    signalSet.async_wait(bind(&NdnTrafficServer::signalHandler, this));
+    m_signalSet.async_wait(bind(&NdnTrafficServer::signalHandler, this));
 
     m_logger.initializeLog(m_instanceId);
     initializeTrafficConfiguration();
@@ -452,6 +451,7 @@ public:
       m_registeredPrefixes.push_back(
         m_face.setInterestFilter(m_trafficPatterns[patternId].m_name,
                                  bind(&NdnTrafficServer::onInterest, this, _1, _2, patternId),
+                                 nullptr,
                                  bind(&NdnTrafficServer::onRegisterFailed, this, _1, _2, patternId)));
     }
 
@@ -480,7 +480,7 @@ private:
 
   boost::asio::io_service m_ioService;
   Face m_face;
-  util::scheduler::Scheduler m_scheduler;
+  boost::asio::signal_set m_signalSet;
   std::vector<DataTrafficConfiguration> m_trafficPatterns;
   std::vector<const RegisteredPrefixId*> m_registeredPrefixes;
 };
