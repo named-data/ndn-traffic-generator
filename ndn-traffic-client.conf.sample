@@ -1,11 +1,11 @@
 #
-#THIS IS A SAMPLE CLIENT INTEREST TRAFFIC CONFIGURATION FILE
+# THIS IS A SAMPLE CLIENT INTEREST TRAFFIC CONFIGURATION FILE
 #
 # * TO BE USED TO GENERATE INTEREST MESSAGES BASED ON A PROBABILITY
 #   PATTERN.
 # * EVERY INIVIDUAL PATTERN DESCRIPTION MUST BE SEPARATED BY ONE
 #   OR MORE '#' CHARACTERS FOR THE TOOL TO DISTINGUISH THEM
-#   INDIVIUDALLY
+#   INDIVIDUALLY
 # * THE FOLLOWING PARAMETERS MAY BE ADDED FOR EVERY TRAFFIC PATTERN
 # * (Mandatory) NEXT TO A PARAMETER MEANS EVERY PATTERN SHOULD HAVE
 #   IT FOR BEING CONSIDERED VALID
@@ -16,29 +16,21 @@
 # * NNI STANDS FOR NON-NEGATIVE INTEGER
 # * RANGE OF POSSIBLE VALUES IS SPECIFIED IN []
 #
-#
-#(Mandatory)
+# (Mandatory)
 #TrafficPercentage=NNI [0-100]
 #Name=NDN Name
 #
-#(Optional)
+# (Optional)
 #NameAppendBytes=NNI [>0]
 #NameAppendSequenceNumber=NNI [>=0]
-#MinSuffixComponents=NNI
-#MaxSuffixComponents=NNI
-#ExcludeBefore=NDN Name Component
-#ExcludeAfter=NDN Name Component
-#ExcludeBeforeBytes=NNI [>0]
-#ExcludeAfterBytes=NNI [>0]
-#ExcludeRange=NDN Name Component (After),NDN Name Component (Before)
-#ChildSelector=NNI [0-1]
 #MustBeFresh=NNI [0-1]
 #NonceDuplicationPercentage=NNI [0-100]
 #InterestLifetime=NNI [Milliseconds]
 #NextHopFaceId=NNI
 #ExpectedContent=String
-#
-#
+
+##########
+# EXAMPLES
 ##########
 TrafficPercentage=50
 Name=/example/A
@@ -48,4 +40,3 @@ TrafficPercentage=50
 Name=/example/B
 ExpectedContent=BBBBBBBB
 ##########
-

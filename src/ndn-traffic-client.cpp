@@ -1,6 +1,6 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil -*- */
-/**
- * Copyright (C) 2014-2016  The University of Arizona.
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+/*
+ * Copyright (c) 2014-2019, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,25 +18,23 @@
  * Author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  */
 
+#include "logger.hpp"
+
 #include <cctype>
-#include <cstdlib>
-#include <fstream>
-#include <string>
 #include <unistd.h>
 #include <vector>
 
-#include <boost/asio.hpp>
+#include <boost/asio/deadline_timer.hpp>
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/signal_set.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/noncopyable.hpp>
 
-#include <ndn-cxx/exclude.hpp>
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/name-component.hpp>
 #include <ndn-cxx/lp/tags.hpp>
 #include <ndn-cxx/util/backports.hpp>
-
-#include "logger.hpp"
 
 namespace ndn {
 
@@ -70,11 +68,6 @@ public:
       : m_trafficPercentage(-1)
       , m_nameAppendBytes(-1)
       , m_nameAppendSequenceNumber(-1)
-      , m_minSuffixComponents(-1)
-      , m_maxSuffixComponents(-1)
-      , m_excludeBeforeBytes(-1)
-      , m_excludeAfterBytes(-1)
-      , m_childSelector(-1)
       , m_mustBeFresh(-1)
       , m_nonceDuplicationPercentage(-1)
       , m_interestLifetime(getDefaultInterestLifetime())
@@ -92,7 +85,7 @@ public:
     static time::milliseconds
     getDefaultInterestLifetime()
     {
-      return time::milliseconds(-1);
+      return -1_ms;
     }
 
     void
@@ -108,27 +101,11 @@ public:
         detail += "NameAppendBytes=" + to_string(m_nameAppendBytes) + ", ";
       if (m_nameAppendSequenceNumber > 0)
         detail += "NameAppendSequenceNumber=" + to_string(m_nameAppendSequenceNumber) + ", ";
-      if (m_minSuffixComponents >= 0)
-        detail += "MinSuffixComponents=" + to_string(m_minSuffixComponents) + ", ";
-      if (m_maxSuffixComponents >= 0)
-        detail += "MaxSuffixComponents=" + to_string(m_maxSuffixComponents) + ", ";
-      if (!m_excludeBefore.empty())
-        detail += "ExcludeBefore=" + m_excludeBefore + ", ";
-      if (!m_excludeAfter.empty())
-        detail += "ExcludeAfter=" + m_excludeAfter + ", ";
-      if (!m_excludeRange.empty())
-        detail += "ExcludeRange=" + m_excludeRange + ", ";
-      if (m_excludeBeforeBytes > 0)
-        detail += "ExcludeBeforeBytes=" + to_string(m_excludeBeforeBytes) + ", ";
-      if (m_excludeAfterBytes > 0)
-        detail += "ExcludeAfterBytes=" + to_string(m_excludeAfterBytes) + ", ";
-      if (m_childSelector >= 0)
-        detail += "ChildSelector=" + to_string(m_childSelector) + ", ";
       if (m_mustBeFresh >= 0)
         detail += "MustBeFresh=" + to_string(m_mustBeFresh) + ", ";
       if (m_nonceDuplicationPercentage > 0)
         detail += "NonceDuplicationPercentage=" + to_string(m_nonceDuplicationPercentage) + ", ";
-      if (m_interestLifetime >= time::milliseconds(0))
+      if (m_interestLifetime >= 0_ms)
         detail += "InterestLifetime=" + to_string(m_interestLifetime.count()) + ", ";
       if (m_nextHopFaceId > 0)
         detail += "NextHopFaceId=" + to_string(m_nextHopFaceId) + ", ";
@@ -183,22 +160,6 @@ public:
             m_nameAppendBytes = std::stoi(value);
           else if (parameter == "NameAppendSequenceNumber")
             m_nameAppendSequenceNumber = std::stoi(value);
-          else if (parameter == "MinSuffixComponents")
-            m_minSuffixComponents = std::stoi(value);
-          else if (parameter == "MaxSuffixComponents")
-            m_maxSuffixComponents = std::stoi(value);
-          else if (parameter == "ExcludeBefore")
-            m_excludeBefore = value;
-          else if (parameter == "ExcludeAfter")
-            m_excludeAfter = value;
-          else if (parameter == "ExcludeBeforeBytes")
-            m_excludeBeforeBytes = std::stoi(value);
-          else if (parameter == "ExcludeAfterBytes")
-            m_excludeAfterBytes = std::stoi(value);
-          else if (parameter == "ExcludeRange")
-            m_excludeRange = value;
-          else if (parameter == "ChildSelector")
-            m_childSelector = std::stoi(value);
           else if (parameter == "MustBeFresh")
             m_mustBeFresh = std::stoi(value);
           else if (parameter == "NonceDuplicationPercentage")
@@ -233,14 +194,6 @@ public:
     std::string m_name;
     int m_nameAppendBytes;
     int m_nameAppendSequenceNumber;
-    int m_minSuffixComponents;
-    int m_maxSuffixComponents;
-    std::string m_excludeBefore;
-    std::string m_excludeAfter;
-    std::string m_excludeRange;
-    int m_excludeBeforeBytes;
-    int m_excludeAfterBytes;
-    int m_childSelector;
     int m_mustBeFresh;
     int m_nonceDuplicationPercentage;
     time::milliseconds m_interestLifetime;
@@ -289,7 +242,7 @@ public:
   static time::milliseconds
   getDefaultInterestInterval()
   {
-    return time::milliseconds(1000);
+    return 1_s;
   }
 
   void
@@ -509,7 +462,7 @@ public:
   {
     if (m_nonces.size() == 0)
       return getNewNonce();
-    int randomNonceIndex = std::rand() % m_nonces.size();
+    std::size_t randomNonceIndex = std::rand() % m_nonces.size();
     return m_nonces[randomNonceIndex];
   }
 
@@ -529,10 +482,10 @@ public:
   }
 
   static name::Component
-  generateRandomNameComponent(size_t length)
+  generateRandomNameComponent(std::size_t length)
   {
     Buffer buffer(length);
-    for (size_t i = 0; i < length; i++) {
+    for (std::size_t i = 0; i < length; i++) {
       buffer[i] = static_cast<uint8_t>(std::rand() % 256);
     }
     return name::Component(buffer);
@@ -543,7 +496,7 @@ public:
          const ndn::Data& data,
          int globalReference,
          int localReference,
-         int patternId,
+         std::size_t patternId,
          time::steady_clock::TimePoint sentTime)
   {
     std::string logLine = "Data Received      - PatternType=" + to_string(patternId + 1);
@@ -553,20 +506,18 @@ public:
 
     m_nInterestsReceived++;
     m_trafficPatterns[patternId].m_nInterestsReceived++;
-    if (!m_trafficPatterns[patternId].m_expectedContent.empty())
-      {
-        std::string receivedContent = reinterpret_cast<const char*>(data.getContent().value());
-        int receivedContentLength = data.getContent().value_size();
-        receivedContent = receivedContent.substr(0, receivedContentLength);
-        if (receivedContent != m_trafficPatterns[patternId].m_expectedContent)
-          {
-            m_nContentInconsistencies++;
-            m_trafficPatterns[patternId].m_nContentInconsistencies++;
-            logLine += ", IsConsistent=No";
-          }
-        else
-          logLine += ", IsConsistent=Yes";
+    if (!m_trafficPatterns[patternId].m_expectedContent.empty()) {
+      std::string receivedContent = reinterpret_cast<const char*>(data.getContent().value());
+      std::size_t receivedContentLength = data.getContent().value_size();
+      receivedContent = receivedContent.substr(0, receivedContentLength);
+      if (receivedContent != m_trafficPatterns[patternId].m_expectedContent) {
+        m_nContentInconsistencies++;
+        m_trafficPatterns[patternId].m_nContentInconsistencies++;
+        logLine += ", IsConsistent=No";
       }
+      else
+        logLine += ", IsConsistent=Yes";
+    }
     else
       logLine += ", IsConsistent=NotChecked";
     if (!m_hasQuietLogging)
@@ -582,13 +533,12 @@ public:
       m_trafficPatterns[patternId].m_maximumInterestRoundTripTime = roundTripTime;
     m_totalInterestRoundTripTime += roundTripTime;
     m_trafficPatterns[patternId].m_totalInterestRoundTripTime += roundTripTime;
-    if (m_nMaximumInterests >= 0 && globalReference == m_nMaximumInterests)
-      {
-        logStatistics();
-        m_logger.shutdownLogger();
-        m_face.shutdown();
-        m_ioService.stop();
-      }
+    if (m_nMaximumInterests >= 0 && globalReference == m_nMaximumInterests) {
+      logStatistics();
+      m_logger.shutdownLogger();
+      m_face.shutdown();
+      m_ioService.stop();
+    }
   }
 
   void
@@ -596,13 +546,13 @@ public:
          const ndn::lp::Nack& nack,
          int globalReference,
          int localReference,
-         int patternId)
+         std::size_t patternId)
   {
     std::string logLine = "Interest Nack'd    - PatternType=" + to_string(patternId + 1);
     logLine += ", GlobalID=" + to_string(globalReference);
     logLine += ", LocalID=" + to_string(localReference);
     logLine += ", Name=" + interest.getName().toUri();
-    logLine += ", NackReason=" + to_string((int)nack.getReason());
+    logLine += ", NackReason=" + boost::lexical_cast<std::string>(nack.getReason());
     m_logger.log(logLine, true, false);
 
     m_nNacks++;
@@ -661,75 +611,6 @@ public:
                   }
 
                 Interest interest(interestName);
-                if (m_trafficPatterns[patternId].m_minSuffixComponents >= 0)
-                  interest.setMinSuffixComponents(
-                    m_trafficPatterns[patternId].m_minSuffixComponents);
-                if (m_trafficPatterns[patternId].m_maxSuffixComponents >= 0)
-                  interest.setMaxSuffixComponents(
-                    m_trafficPatterns[patternId].m_maxSuffixComponents);
-
-                Exclude exclude;
-                if (!m_trafficPatterns[patternId].m_excludeBefore.empty() &&
-                    !m_trafficPatterns[patternId].m_excludeAfter.empty())
-                  {
-                    exclude.excludeRange(
-                      name::Component(
-                        m_trafficPatterns[patternId].m_excludeAfter),
-                      name::Component(m_trafficPatterns[patternId].m_excludeBefore));
-                    interest.setExclude(exclude);
-                  }
-                else if (!m_trafficPatterns[patternId].m_excludeBefore.empty())
-                  {
-                    exclude.excludeBefore(
-                      name::Component(m_trafficPatterns[patternId].m_excludeBefore));
-                    interest.setExclude(exclude);
-                  }
-                else if (!m_trafficPatterns[patternId].m_excludeAfter.empty())
-                  {
-                    exclude.excludeAfter(
-                      name::Component(m_trafficPatterns[patternId].m_excludeAfter));
-                    interest.setExclude(exclude);
-                  }
-                if (m_trafficPatterns[patternId].m_excludeBeforeBytes > 0 &&
-                    m_trafficPatterns[patternId].m_excludeAfterBytes > 0)
-                  {
-                    exclude.excludeRange(
-                      generateRandomNameComponent(
-                        m_trafficPatterns[patternId].m_excludeAfterBytes),
-                      generateRandomNameComponent(
-                        m_trafficPatterns[patternId].m_excludeBeforeBytes));
-                    interest.setExclude(exclude);
-                  }
-                else if (m_trafficPatterns[patternId].m_excludeBeforeBytes > 0)
-                  {
-                    exclude.excludeBefore(
-                      generateRandomNameComponent(
-                        m_trafficPatterns[patternId].m_excludeBeforeBytes));
-                    interest.setExclude(exclude);
-                  }
-                else if (m_trafficPatterns[patternId].m_excludeAfterBytes > 0)
-                  {
-                    exclude.excludeAfter(
-                      generateRandomNameComponent(
-                        m_trafficPatterns[patternId].m_excludeAfterBytes));
-                    interest.setExclude(exclude);
-                  }
-
-                if (!m_trafficPatterns[patternId].m_excludeRange.empty()) {
-                  auto& range = m_trafficPatterns[patternId].m_excludeRange;
-
-                  if (range.find(",") != std::string::npos) {
-                    std::string after = range.substr(0, range.find(","));
-                    std::string before = range.substr(range.find(",") + 1, std::string::npos);
-                    exclude.clear();
-                    exclude.excludeRange(name::Component::fromEscapedString(after),
-                                         name::Component::fromEscapedString(before));
-                    interest.setExclude(exclude);
-                  }
-                }
-
-                if (m_trafficPatterns[patternId].m_childSelector >= 0)
-                  interest.setChildSelector(m_trafficPatterns[patternId].m_childSelector);
 
                 if (m_trafficPatterns[patternId].m_mustBeFresh == 0)
                   interest.setMustBeFresh(false);
@@ -746,7 +627,7 @@ public:
                   }
                 else
                   interest.setNonce(getNewNonce());
-                if (m_trafficPatterns[patternId].m_interestLifetime >= time::milliseconds(0))
+                if (m_trafficPatterns[patternId].m_interestLifetime >= 0_ms)
                   interest.setInterestLifetime(m_trafficPatterns[patternId].m_interestLifetime);
 
                 if (m_trafficPatterns[patternId].m_nextHopFaceId > 0) {
@@ -757,7 +638,7 @@ public:
                 try {
                   m_nInterestsSent++;
                   m_trafficPatterns[patternId].m_nInterestsSent++;
-                  time::steady_clock::TimePoint sentTime = time::steady_clock::now();
+                  auto sentTime = time::steady_clock::now();
                   m_face.expressInterest(interest,
                                          bind(&NdnTrafficClient::onData,
                                               this, _1, _2, m_nInterestsSent,
@@ -787,7 +668,7 @@ public:
                   timer->async_wait(bind(&NdnTrafficClient::generateTraffic, this, timer));
                 }
                 catch (const std::exception& e) {
-                  m_logger.log("ERROR: " + std::string(e.what()), true, true);
+                  m_logger.log("ERROR: "s + e.what(), true, true);
                 }
                 break;
               }
@@ -809,12 +690,11 @@ public:
     m_logger.initializeLog(m_instanceId);
     initializeTrafficConfiguration();
 
-    if (m_nMaximumInterests == 0)
-      {
-        logStatistics();
-        m_logger.shutdownLogger();
-        return;
-      }
+    if (m_nMaximumInterests == 0) {
+      logStatistics();
+      m_logger.shutdownLogger();
+      return;
+    }
 
     boost::asio::deadline_timer deadlineTimer(m_ioService,
       boost::posix_time::millisec(m_interestInterval.count()));
@@ -824,7 +704,7 @@ public:
       m_face.processEvents();
     }
     catch (const std::exception& e) {
-      m_logger.log("ERROR: " + std::string(e.what()), true, true);
+      m_logger.log("ERROR: "s + e.what(), true, true);
       m_logger.shutdownLogger();
       m_hasError = true;
       m_ioService.stop();
@@ -849,8 +729,7 @@ private:
   int m_nNacks;
   int m_nContentInconsistencies;
 
-  //round trip time is stored as milliseconds with fractional
-  //sub-milliseconds precision
+  // RTT is stored as milliseconds with fractional sub-milliseconds precision
   double m_minimumInterestRoundTripTime;
   double m_maximumInterestRoundTripTime;
   double m_totalInterestRoundTripTime;
