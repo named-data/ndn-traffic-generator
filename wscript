@@ -23,15 +23,13 @@ def configure(conf):
     conf.check_compiler_flags()
 
 def build(bld):
-    bld.program(
-        target='ndn-traffic',
-        source='src/ndn-traffic-client.cpp',
-        use='NDN_CXX')
+    bld.program(target='ndn-traffic',
+                source='src/ndn-traffic-client.cpp',
+                use='NDN_CXX')
 
-    bld.program(
-        target='ndn-traffic-server',
-        source='src/ndn-traffic-server.cpp',
-        use='NDN_CXX')
+    bld.program(target='ndn-traffic-server',
+                source='src/ndn-traffic-server.cpp',
+                use='NDN_CXX')
 
     bld.install_files('${SYSCONFDIR}/ndn', ['ndn-traffic-client.conf.sample',
                                             'ndn-traffic-server.conf.sample'])
