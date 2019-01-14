@@ -1,6 +1,6 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil -*- */
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014-2018  Arizona Board of Regents.
+ * Copyright (c) 2014-2019, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,23 +19,29 @@
  */
 
 #include "logger.hpp"
+#include "util.hpp"
 
+#include <ndn-cxx/data.hpp>
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
 #include <ndn-cxx/security/signing-info.hpp>
 #include <ndn-cxx/util/backports.hpp>
+#include <ndn-cxx/util/random.hpp>
+
+#include <cctype>
+#include <limits>
+#include <sstream>
+#include <vector>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/signal_set.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/variables_map.hpp>
+#include <boost/thread/thread.hpp>
 
-#include <cctype>
-#include <cstdlib>
-#include <fstream>
-#include <string>
-#include <unistd.h>
-#include <vector>
+namespace po = boost::program_options;
 
 namespace ndn {
 
@@ -43,178 +49,12 @@ class NdnTrafficServer : boost::noncopyable
 {
 public:
   explicit
-  NdnTrafficServer(const char* programName)
-    : m_logger("NdnTrafficServer")
-    , m_programName(programName)
-    , m_hasError(false)
-    , m_hasQuietLogging(false)
-    , m_nRegistrationsFailed(0)
-    , m_nMaximumInterests(-1)
-    , m_nInterestsReceived(0)
-    , m_contentDelay(time::milliseconds(-1))
-    , m_instanceId(to_string(std::rand()))
+  NdnTrafficServer(const std::string& configFile)
+    : m_signalSet(m_ioService, SIGINT, SIGTERM)
+    , m_logger("NdnTrafficServer")
     , m_face(m_ioService)
-    , m_signalSet(m_ioService, SIGINT, SIGTERM)
+    , m_configurationFile(configFile)
   {
-  }
-
-  class DataTrafficConfiguration
-  {
-  public:
-    DataTrafficConfiguration()
-      : m_contentType(-1)
-      , m_freshnessPeriod(time::milliseconds(-1))
-      , m_contentBytes(-1)
-      , m_contentDelay(time::milliseconds(-1))
-      , m_nInterestsReceived(0)
-      , m_signingInfo()
-    {
-    }
-
-    void
-    printTrafficConfiguration(Logger& logger)
-    {
-      std::stringstream detail;
-
-      if (!m_name.empty()) {
-        detail << "Name=" << m_name << ", ";
-      }
-      if (m_contentType >= 0) {
-        detail << "ContentType=" << to_string(m_contentType) << ", ";
-      }
-      if (m_freshnessPeriod >= time::milliseconds(0)) {
-        detail << "FreshnessPeriod=" <<
-                  to_string(static_cast<int>(m_freshnessPeriod.count())) << ", ";
-      }
-      if (m_contentBytes >= 0) {
-        detail << "ContentBytes=" << to_string(m_contentBytes) << ", ";
-      }
-      if (m_contentDelay >= time::milliseconds(0)) {
-        detail << "ContentDelay=" << to_string(m_contentDelay.count()) << ", ";
-      }
-      if (!m_content.empty()) {
-        detail << "Content=" << m_content << ", ";
-      }
-      detail << "SigningInfo=" << m_signingInfo;
-
-      logger.log(detail.str(), false, false);
-    }
-
-    bool
-    extractParameterValue(const std::string& detail, std::string& parameter, std::string& value)
-    {
-      std::string allowedCharacters = ":/+._-%";
-      std::size_t i = 0;
-
-      parameter = "";
-      value = "";
-      while (detail[i] != '=' && i < detail.length()) {
-        parameter += detail[i];
-        i++;
-      }
-      if (i == detail.length())
-        return false;
-
-      i++;
-      while ((std::isalnum(detail[i]) ||
-              allowedCharacters.find(detail[i]) != std::string::npos) &&
-             i < detail.length()) {
-        value += detail[i];
-        i++;
-      }
-
-      if (parameter.empty() || value.empty())
-        return false;
-      else
-        return true;
-    }
-
-    bool
-    processConfigurationDetail(const std::string& detail,
-                               Logger& logger,
-                               int lineNumber)
-    {
-      std::string parameter, value;
-      if (extractParameterValue(detail, parameter, value)) {
-        if (parameter == "Name") {
-          m_name = value;
-        }
-        else if (parameter == "ContentType") {
-          m_contentType = std::stoi(value);
-        }
-        else if (parameter == "FreshnessPeriod") {
-          m_freshnessPeriod = time::milliseconds(std::stoi(value));
-        }
-        else if (parameter == "ContentDelay") {
-          m_contentDelay = time::milliseconds(std::stoi(value));
-        }
-        else if (parameter == "ContentBytes") {
-          m_contentBytes = std::stoi(value);
-        }
-        else if (parameter == "Content") {
-          m_content = value;
-        }
-        else if (parameter == "SigningInfo") {
-          m_signingInfo = security::SigningInfo(value);
-        }
-        else {
-          logger.log("Line " + to_string(lineNumber) +
-                     " \t- Invalid Parameter='" + parameter + "'", false, true);
-        }
-      }
-      else {
-        logger.log("Line " + to_string(lineNumber) +
-                   " \t- Improper Traffic Configuration Line - " + detail, false, true);
-        return false;
-      }
-
-      return true;
-    }
-
-    bool
-    checkTrafficDetailCorrectness()
-    {
-      return true;
-    }
-
-  private:
-    std::string m_name;
-    int m_contentType;
-    time::milliseconds m_freshnessPeriod;
-    int m_contentBytes;
-    time::milliseconds m_contentDelay;
-    std::string m_content;
-    int m_nInterestsReceived;
-    security::SigningInfo m_signingInfo;
-
-    friend class NdnTrafficServer;
-  };
-
-  void
-  usage() const
-  {
-    std::cout << "Usage:\n"
-              << "  " << m_programName << " [options] <Traffic_Configuration_File>\n"
-              << "\n"
-              << "Respond to Interests as per provided Traffic Configuration File.\n"
-              << "Multiple prefixes can be configured for handling.\n"
-              << "Set environment variable NDN_TRAFFIC_LOGFOLDER to redirect output to a log file.\n"
-              << "\n"
-              << "Options:\n"
-              << "  [-d interval] - set delay before responding to interest, in milliseconds\n"
-              << "  [-c count]    - specify maximum number of interests to be satisfied\n"
-              << "  [-q]          - quiet mode: no interest reception/data generation logging\n"
-              << "  [-h]          - print this help text and exit\n";
-    exit(EXIT_FAILURE);
-  }
-
-  void
-  setMaximumInterests(int maximumInterests)
-  {
-    if (maximumInterests < 0) {
-      usage();
-    }
-    m_nMaximumInterests = maximumInterests;
   }
 
   bool
@@ -224,36 +64,147 @@ public:
   }
 
   void
-  setContentDelay(int contentDelay)
+  setMaximumInterests(uint64_t maxInterests)
   {
-    if (contentDelay < 0) {
-      usage();
-    }
-    m_contentDelay = time::milliseconds(contentDelay);
+    m_nMaximumInterests = maxInterests;
   }
 
   void
-  setConfigurationFile(const char* configurationFile)
+  setContentDelay(time::milliseconds delay)
   {
-    m_configurationFile = configurationFile;
+    BOOST_ASSERT(delay >= 0_ms);
+    m_contentDelay = delay;
   }
 
   void
   setQuietLogging()
   {
-    m_hasQuietLogging = true;
+    m_wantQuiet = true;
   }
 
   void
-  signalHandler()
+  run()
   {
-    logStatistics();
+    m_logger.initializeLog(to_string(random::generateWord32()));
+    initializeTrafficConfiguration();
 
-    m_face.shutdown();
-    m_ioService.stop();
+    if (m_nMaximumInterests == 0) {
+      logStatistics();
+      return;
+    }
 
-    exit(m_hasError ? EXIT_FAILURE : EXIT_SUCCESS);
+    m_signalSet.async_wait([this] (const boost::system::error_code&, int) {
+      if (m_nMaximumInterests && m_nInterestsReceived < *m_nMaximumInterests) {
+        m_hasError = true;
+      }
+      stop();
+    });
+
+    for (std::size_t id = 0; id < m_trafficPatterns.size(); id++) {
+      m_registeredPrefixes.push_back(
+        m_face.setInterestFilter(m_trafficPatterns[id].m_name,
+                                 [=] (auto&&, const auto& interest) { this->onInterest(interest, id); },
+                                 nullptr,
+                                 [=] (auto&&, const auto& reason) { this->onRegisterFailed(reason, id); }));
+    }
+
+    try {
+      m_face.processEvents();
+    }
+    catch (const std::exception& e) {
+      m_logger.log("ERROR: "s + e.what(), true, true);
+      m_hasError = true;
+      m_ioService.stop();
+    }
   }
+
+private:
+  class DataTrafficConfiguration
+  {
+  public:
+    void
+    printTrafficConfiguration(Logger& logger) const
+    {
+      std::ostringstream os;
+
+      if (!m_name.empty()) {
+        os << "Name=" << m_name << ", ";
+      }
+      if (m_contentDelay >= 0_ms) {
+        os << "ContentDelay=" << m_contentDelay.count() << ", ";
+      }
+      if (m_freshnessPeriod >= 0_ms) {
+        os << "FreshnessPeriod=" << m_freshnessPeriod.count() << ", ";
+      }
+      if (m_contentType) {
+        os << "ContentType=" << *m_contentType << ", ";
+      }
+      if (m_contentLength) {
+        os << "ContentBytes=" << *m_contentLength << ", ";
+      }
+      if (!m_content.empty()) {
+        os << "Content=" << m_content << ", ";
+      }
+      os << "SigningInfo=" << m_signingInfo;
+
+      logger.log(os.str(), false, false);
+    }
+
+    bool
+    processConfigurationDetail(const std::string& detail, Logger& logger, int lineNumber)
+    {
+      std::string parameter, value;
+      if (parseParameterAndValue(detail, parameter, value)) {
+        if (parameter == "Name") {
+          m_name = value;
+        }
+        else if (parameter == "ContentDelay") {
+          m_contentDelay = time::milliseconds(std::stoul(value));
+        }
+        else if (parameter == "FreshnessPeriod") {
+          m_freshnessPeriod = time::milliseconds(std::stoul(value));
+        }
+        else if (parameter == "ContentType") {
+          m_contentType = std::stoul(value);
+        }
+        else if (parameter == "ContentBytes") {
+          m_contentLength = std::stoul(value);
+        }
+        else if (parameter == "Content") {
+          m_content = value;
+        }
+        else if (parameter == "SigningInfo") {
+          m_signingInfo = security::SigningInfo(value);
+        }
+        else {
+          logger.log("Line " + to_string(lineNumber) +
+                     " - Unknown parameter '" + parameter + "'", false, true);
+        }
+      }
+      else {
+        logger.log("Line " + to_string(lineNumber) +
+                   " - Invalid traffic configuration line: " + detail, false, true);
+        return false;
+      }
+      return true;
+    }
+
+    bool
+    checkTrafficDetailCorrectness() const
+    {
+      return true;
+    }
+
+  public:
+    std::string m_name;
+    time::milliseconds m_contentDelay = -1_ms;
+    time::milliseconds m_freshnessPeriod = -1_ms;
+    optional<uint32_t> m_contentType;
+    optional<std::size_t> m_contentLength;
+    std::string m_content;
+    security::SigningInfo m_signingInfo;
+    uint64_t m_nInterestsReceived = 0;
+  };
 
   void
   logStatistics()
@@ -264,20 +215,16 @@ public:
     m_logger.log("Total Interests Received    = " +
                  to_string(m_nInterestsReceived), false, true);
 
-    if (m_nInterestsReceived < m_nMaximumInterests) {
-      m_hasError = true;
-    }
-
     for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
       m_logger.log("\nTraffic Pattern Type #" + to_string(patternId + 1), false, true);
       m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
-      m_logger.log("Total Interests Received    = " + to_string(
-                     m_trafficPatterns[patternId].m_nInterestsReceived) + "\n", false, true);
+      m_logger.log("Total Interests Received    = " +
+                   to_string(m_trafficPatterns[patternId].m_nInterestsReceived) + "\n", false, true);
     }
   }
 
   bool
-  checkTrafficPatternCorrectness()
+  checkTrafficPatternCorrectness() const
   {
     return true;
   }
@@ -285,13 +232,13 @@ public:
   void
   parseConfigurationFile()
   {
-    std::string patternLine;
     std::ifstream patternFile;
-    m_logger.log("Analyzing Traffic Configuration File: " + m_configurationFile, true, true);
+    m_logger.log("Parsing traffic configuration file: " + m_configurationFile, true, true);
 
-    patternFile.open(m_configurationFile.c_str());
+    patternFile.open(m_configurationFile.data());
     if (patternFile.is_open()) {
       int lineNumber = 0;
+      std::string patternLine;
       while (getline(patternFile, patternLine)) {
         lineNumber++;
         if (std::isalpha(patternLine[0])) {
@@ -320,209 +267,241 @@ public:
       patternFile.close();
 
       if (!checkTrafficPatternCorrectness()) {
-        m_logger.log("ERROR - Traffic Configuration Provided Is Not Proper - " +
+        m_logger.log("ERROR: Traffic configuration provided is not proper - " +
                      m_configurationFile, false, true);
-        exit(EXIT_FAILURE);
+        exit(2);
       }
 
-      m_logger.log("Traffic Configuration File Processing Completed\n", true, false);
+      m_logger.log("Traffic configuration file processing completed.\n", true, false);
       for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
-        m_logger.log("Traffic Pattern Type #" +
-                     to_string(patternId + 1), false, false);
+        m_logger.log("Traffic Pattern Type #" + to_string(patternId + 1), false, false);
         m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
         m_logger.log("", false, false);
       }
     }
     else {
-      m_logger.log("ERROR - Unable To Open Traffic Configuration File: " +
-        m_configurationFile, false, true);
-      exit(EXIT_FAILURE);
+      m_logger.log("ERROR: Unable to open traffic configuration file: " + m_configurationFile, false, true);
+      exit(2);
     }
   }
 
   void
   initializeTrafficConfiguration()
   {
-    if (boost::filesystem::exists(boost::filesystem::path(m_configurationFile))) {
-      if (boost::filesystem::is_regular_file(boost::filesystem::path(m_configurationFile))) {
+    namespace fs = boost::filesystem;
+
+    fs::path configPath(m_configurationFile);
+    if (fs::exists(configPath)) {
+      if (fs::is_regular_file(configPath)) {
         parseConfigurationFile();
       }
       else {
-        m_logger.log("ERROR - Traffic Configuration File Is Not A Regular File: " +
+        m_logger.log("ERROR: Traffic configuration file is not a regular file: " +
                      m_configurationFile, false, true);
-        exit(EXIT_FAILURE);
+        exit(2);
       }
     }
     else {
-      m_logger.log("ERROR - Traffic Configuration File Does Not Exist: " +
+      m_logger.log("ERROR: Traffic configuration file does not exist: " +
                    m_configurationFile, false, true);
-      exit(EXIT_FAILURE);
+      exit(2);
     }
   }
 
   static std::string
-  getRandomByteString(std::size_t randomSize)
+  getRandomByteString(std::size_t length)
   {
-    std::string randomString;
-    for (std::size_t i = 0; i < randomSize; i++) {
-      randomString += static_cast<char>(std::rand() % 128);
+    // per ISO C++ std, cannot instantiate uniform_int_distribution with char
+    static std::uniform_int_distribution<short> dist(std::numeric_limits<char>::min(),
+                                                     std::numeric_limits<char>::max());
+
+    std::string s;
+    s.reserve(length);
+    for (std::size_t i = 0; i < length; i++) {
+      s += static_cast<char>(dist(random::getRandomNumberEngine()));
     }
-    return randomString;
+    return s;
   }
 
   void
-  onInterest(const Name& name, const Interest& interest, int patternId)
+  onInterest(const Interest& interest, std::size_t patternId)
   {
     auto& pattern = m_trafficPatterns[patternId];
 
-    if (m_nMaximumInterests < 0 || m_nInterestsReceived < m_nMaximumInterests) {
+    if (!m_nMaximumInterests || m_nInterestsReceived < *m_nMaximumInterests) {
       Data data(interest.getName());
 
-      if (pattern.m_contentType >= 0)
-        data.setContentType(pattern.m_contentType);
-
-      if (pattern.m_freshnessPeriod >= time::milliseconds(0))
+      if (pattern.m_freshnessPeriod >= 0_ms)
         data.setFreshnessPeriod(pattern.m_freshnessPeriod);
 
+      if (pattern.m_contentType)
+        data.setContentType(*pattern.m_contentType);
+
       std::string content;
-      if (pattern.m_contentBytes >= 0)
-        content = getRandomByteString(pattern.m_contentBytes);
+      if (pattern.m_contentLength > 0)
+        content = getRandomByteString(*pattern.m_contentLength);
       if (!pattern.m_content.empty())
         content = pattern.m_content;
+      data.setContent(reinterpret_cast<const uint8_t*>(content.data()), content.length());
 
-      data.setContent(reinterpret_cast<const uint8_t*>(content.c_str()), content.length());
       m_keyChain.sign(data, pattern.m_signingInfo);
 
       m_nInterestsReceived++;
       pattern.m_nInterestsReceived++;
 
-      if (!m_hasQuietLogging) {
-        std::string logLine =
-          "Interest Received          - PatternType=" + to_string(patternId + 1) +
-          ", GlobalID=" + to_string(m_nInterestsReceived) +
-          ", LocalID=" + to_string(pattern.m_nInterestsReceived) +
-          ", Name=" + pattern.m_name;
+      if (!m_wantQuiet) {
+        auto logLine = "Interest received          - PatternType=" + to_string(patternId + 1) +
+                       ", GlobalID=" + to_string(m_nInterestsReceived) +
+                       ", LocalID=" + to_string(pattern.m_nInterestsReceived) +
+                       ", Name=" + pattern.m_name;
         m_logger.log(logLine, true, false);
       }
 
-      if (pattern.m_contentDelay > time::milliseconds(-1))
-        usleep(pattern.m_contentDelay.count() * 1000);
-      if (m_contentDelay > time::milliseconds(-1))
-        usleep(m_contentDelay.count() * 1000);
+      if (pattern.m_contentDelay > 0_ms)
+        boost::this_thread::sleep_for(pattern.m_contentDelay);
+      if (m_contentDelay > 0_ms)
+        boost::this_thread::sleep_for(m_contentDelay);
+
       m_face.put(data);
     }
-    if (m_nMaximumInterests >= 0 && m_nInterestsReceived == m_nMaximumInterests) {
+
+    if (m_nMaximumInterests && m_nInterestsReceived >= *m_nMaximumInterests) {
       logStatistics();
-      for (auto registeredPrefix : m_registeredPrefixes) {
-        m_face.unsetInterestFilter(registeredPrefix);
-      }
+      m_registeredPrefixes.clear();
       m_signalSet.cancel();
     }
   }
 
   void
-  onRegisterFailed(const ndn::Name& prefix, const std::string& reason, int patternId)
+  onRegisterFailed(const std::string& reason, std::size_t patternId)
   {
-    std::string logLine;
-    logLine += "Prefix Registration Failed - PatternType=" + to_string(patternId + 1);
-    logLine += ", Name=" + m_trafficPatterns[patternId].m_name;
+    auto logLine = "Prefix registration failed - PatternType=" + to_string(patternId + 1) +
+                   ", Name=" + m_trafficPatterns[patternId].m_name +
+                   ", Reason=" + reason;
     m_logger.log(logLine, true, true);
 
     m_nRegistrationsFailed++;
     if (m_nRegistrationsFailed == m_trafficPatterns.size()) {
       m_hasError = true;
-      signalHandler();
+      stop();
     }
   }
 
   void
-  run()
+  stop()
   {
-    m_signalSet.async_wait(bind(&NdnTrafficServer::signalHandler, this));
-
-    m_logger.initializeLog(m_instanceId);
-    initializeTrafficConfiguration();
-    if (m_nMaximumInterests == 0) {
-      logStatistics();
-      return;
-    }
-
-    for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
-      m_registeredPrefixes.push_back(
-        m_face.setInterestFilter(m_trafficPatterns[patternId].m_name,
-                                 bind(&NdnTrafficServer::onInterest, this, _1, _2, patternId),
-                                 nullptr,
-                                 bind(&NdnTrafficServer::onRegisterFailed, this, _1, _2, patternId)));
-    }
-
-    try {
-      m_face.processEvents();
-    }
-    catch (const std::exception& e) {
-      m_logger.log("ERROR: " + std::string(e.what()), true, true);
-      m_hasError = true;
-      m_ioService.stop();
-    }
+    logStatistics();
+    m_face.shutdown();
+    m_ioService.stop();
   }
 
 private:
-  KeyChain m_keyChain;
-  Logger m_logger;
-  std::string m_programName;
-  bool m_hasError;
-  bool m_hasQuietLogging;
-  std::size_t m_nRegistrationsFailed;
-  int m_nMaximumInterests;
-  int m_nInterestsReceived;
-  time::milliseconds m_contentDelay;
-  std::string m_instanceId;
-  std::string m_configurationFile;
-
   boost::asio::io_service m_ioService;
-  Face m_face;
   boost::asio::signal_set m_signalSet;
+  Logger m_logger;
+  Face m_face;
+  KeyChain m_keyChain;
+
+  std::string m_configurationFile;
+  optional<uint64_t> m_nMaximumInterests;
+  time::milliseconds m_contentDelay = 0_ms;
+  bool m_wantQuiet = false;
+
   std::vector<DataTrafficConfiguration> m_trafficPatterns;
-  std::vector<const RegisteredPrefixId*> m_registeredPrefixes;
+  std::vector<ScopedRegisteredPrefixHandle> m_registeredPrefixes;
+  uint64_t m_nRegistrationsFailed = 0;
+  uint64_t m_nInterestsReceived = 0;
+  bool m_hasError = false;
 };
 
 } // namespace ndn
 
+static void
+usage(std::ostream& os, const std::string& programName, const po::options_description& desc)
+{
+  os << "Usage: " << programName << " [options] <Traffic_Configuration_File>\n"
+     << "\n"
+     << "Respond to Interests as per provided Traffic_Configuration_File.\n"
+     << "Multiple prefixes can be configured for handling.\n"
+     << "Set the environment variable NDN_TRAFFIC_LOGFOLDER to redirect output to a log file.\n"
+     << "\n"
+     << desc;
+}
+
 int
 main(int argc, char* argv[])
 {
-  std::srand(std::time(nullptr));
+  std::string configFile;
 
-  ndn::NdnTrafficServer server(argv[0]);
-  int option;
-  while ((option = getopt(argc, argv, "hqc:d:")) != -1) {
-    switch (option) {
-    case 'h':
-      server.usage();
-      break;
-    case 'c':
-      server.setMaximumInterests(atoi(optarg));
-      break;
-    case 'd':
-      server.setContentDelay(atoi(optarg));
-      break;
-    case 'q':
-      server.setQuietLogging();
-      break;
-    default:
-      server.usage();
-      break;
+  po::options_description visibleOptions("Options");
+  visibleOptions.add_options()
+    ("help,h",    "print this help message and exit")
+    ("count,c",   po::value<int>(), "maximum number of Interests to respond to")
+    ("delay,d",   po::value<ndn::time::milliseconds::rep>()->default_value(0),
+                  "wait this amount of milliseconds before responding to each Interest")
+    ("quiet,q",   po::bool_switch(), "turn off logging of Interest reception/Data generation")
+    ;
+
+  po::options_description hiddenOptions;
+  hiddenOptions.add_options()
+    ("config-file", po::value<std::string>(&configFile))
+    ;
+
+  po::positional_options_description posOptions;
+  posOptions.add("config-file", -1);
+
+  po::options_description allOptions;
+  allOptions.add(visibleOptions).add(hiddenOptions);
+
+  po::variables_map vm;
+  try {
+    po::store(po::command_line_parser(argc, argv).options(allOptions).positional(posOptions).run(), vm);
+    po::notify(vm);
+  }
+  catch (const po::error& e) {
+    std::cerr << "ERROR: " << e.what() << std::endl;
+    return 2;
+  }
+  catch (const boost::bad_any_cast& e) {
+    std::cerr << "ERROR: " << e.what() << std::endl;
+    return 2;
+  }
+
+  if (vm.count("help") > 0) {
+    usage(std::cout, argv[0], visibleOptions);
+    return 0;
+  }
+
+  if (configFile.empty()) {
+    usage(std::cerr, argv[0], visibleOptions);
+    return 2;
+  }
+
+  ndn::NdnTrafficServer server(configFile);
+
+  if (vm.count("count") > 0) {
+    int count = vm["count"].as<int>();
+    if (count < 0) {
+      std::cerr << "ERROR: the argument for option '--count' cannot be negative" << std::endl;
+      return 2;
     }
+    server.setMaximumInterests(static_cast<uint64_t>(count));
   }
 
-  argc -= optind;
-  argv += optind;
-
-  if (!argc) {
-    server.usage();
+  if (vm.count("delay") > 0) {
+    ndn::time::milliseconds delay(vm["delay"].as<ndn::time::milliseconds::rep>());
+    if (delay < ndn::time::milliseconds::zero()) {
+      std::cerr << "ERROR: the argument for option '--delay' cannot be negative" << std::endl;
+      return 2;
+    }
+    server.setContentDelay(delay);
   }
 
-  server.setConfigurationFile(argv[0]);
+  if (vm["quiet"].as<bool>()) {
+    server.setQuietLogging();
+  }
+
   server.run();
 
-  return server.hasError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  return server.hasError() ? 1 : 0;
 }
