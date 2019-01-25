@@ -1,5 +1,4 @@
-Traffic Generator for NDN (ndn-traffic-generator)
-=================================================
+# ndn-traffic-generator: Traffic Generator for NDN
 
 [![Build Status](https://travis-ci.org/named-data/ndn-traffic-generator.svg?branch=master)](https://travis-ci.org/named-data/ndn-traffic-generator)
 
@@ -9,7 +8,8 @@ used to specify the pattern of NDN traffic that is required to be generated.
 Sample configuration files are provided which include instructions on how
 to configure various parameters.
 
-## Prerequisites ##
+
+## Prerequisites
 
 Compiling and running ndn-traffic-generator requires the following dependencies:
 
@@ -20,16 +20,17 @@ Compiling and running ndn-traffic-generator requires the following dependencies:
 
 2. NDN forwarding daemon <https://github.com/named-data/NFD>
 
------------------------------------------------------
 
-## 1. Compilation & Installation Instructions: ##
+## Compilation & Installation
 
     ./waf configure
     ./waf
     sudo ./waf install
 
 
-## 2. Tool Run Instructions & Command Line Options: ##
+## Command Line Options
+
+#### ndn-traffic-server
 
     Usage: ndn-traffic-server [options] <Traffic_Configuration_File>
     Respond to Interests as per provided Traffic_Configuration_File.
@@ -41,7 +42,9 @@ Compiling and running ndn-traffic-generator requires the following dependencies:
       -d [ --delay ] arg (=0) wait this amount of milliseconds before responding to each Interest
       -q [ --quiet ]          turn off logging of Interest reception/Data generation
 
-    Usage: ndn-traffic [options] <Traffic_Configuration_File>
+#### ndn-traffic-client
+
+    Usage: ndn-traffic-client [options] <Traffic_Configuration_File>
     Generate Interest traffic as per provided Traffic_Configuration_File.
     Interests are continuously generated unless a total number is specified.
     Set the environment variable NDN_TRAFFIC_LOGFOLDER to redirect output to a log file.
@@ -51,25 +54,25 @@ Compiling and running ndn-traffic-generator requires the following dependencies:
       -i [ --interval ] arg (=1000) Interest generation interval in milliseconds
       -q [ --quiet ]                turn off logging of Interest generation/Data reception
 
+* These tools need not be used together and can be used individually as well.
+* Please refer to the sample configuration files provided for details on how to create your own.
+* Use the command line options shown above to adjust traffic configuration.
 
-## 3. Sample Run Instructions ##
 
-__ON MACHINE #1__
+### Sample Run Instructions
+
+##### ON MACHINE #1
 
 (NFD must be running)
 
-Start traffic server:
+Start the traffic server:
 
         ndn-traffic-server ndn-traffic-server.conf
 
-__ON MACHINE #2__
+##### ON MACHINE #2
 
 (NFD must be running)
 
 Start the traffic client:
 
-        ndn-traffic ndn-traffic-client.conf
-
-* These tools need not be used together and can be used individually as well.
-* Please refer to the sample configuration files provided for details on how to create your own.
-* Use the command line options shown above to adjust traffic configuration.
+        ndn-traffic-client ndn-traffic-client.conf

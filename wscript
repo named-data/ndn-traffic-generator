@@ -23,7 +23,7 @@ def configure(conf):
     conf.check_compiler_flags()
 
 def build(bld):
-    bld.program(target='ndn-traffic',
+    bld.program(target='ndn-traffic-client',
                 source='src/ndn-traffic-client.cpp',
                 use='NDN_CXX')
 
