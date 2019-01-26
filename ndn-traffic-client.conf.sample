@@ -22,6 +22,7 @@
 # (Optional)
 #NameAppendBytes=NNI [>0]
 #NameAppendSequenceNumber=NNI [>=0]
+#CanBePrefix=Boolean
 #MustBeFresh=Boolean
 #NonceDuplicationPercentage=NNI [0-100]
 #InterestLifetime=Milliseconds [>=0]

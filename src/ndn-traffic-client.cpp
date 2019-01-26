@@ -27,6 +27,7 @@
 #include <ndn-cxx/util/random.hpp>
 
 #include <limits>
+#include <sstream>
 #include <vector>
 
 #include <boost/asio/deadline_timer.hpp>
@@ -124,27 +125,38 @@ private:
     void
     printTrafficConfiguration(Logger& logger) const
     {
-      std::string detail;
+      std::ostringstream os;
 
-      detail += "TrafficPercentage=" + to_string(m_trafficPercentage) + ", ";
-      detail += "Name=" + m_name + ", ";
-      if (m_nameAppendBytes)
-        detail += "NameAppendBytes=" + to_string(*m_nameAppendBytes) + ", ";
-      if (m_nameAppendSeqNum)
-        detail += "NameAppendSequenceNumber=" + to_string(*m_nameAppendSeqNum) + ", ";
-      detail += "MustBeFresh=" + to_string(m_mustBeFresh) + ", ";
-      if (m_nonceDuplicationPercentage > 0)
-        detail += "NonceDuplicationPercentage=" + to_string(m_nonceDuplicationPercentage) + ", ";
-      if (m_interestLifetime >= 0_ms)
-        detail += "InterestLifetime=" + to_string(m_interestLifetime.count()) + ", ";
-      if (m_nextHopFaceId > 0)
-        detail += "NextHopFaceId=" + to_string(m_nextHopFaceId) + ", ";
-      if (m_expectedContent)
-        detail += "ExpectedContent=" + *m_expectedContent + ", ";
-      if (detail.length() >= 2)
-        detail = detail.substr(0, detail.length() - 2); // Removing suffix ", "
+      os << "TrafficPercentage=" << m_trafficPercentage << ", ";
+      os << "Name=" << m_name << ", ";
+      if (m_nameAppendBytes) {
+        os << "NameAppendBytes=" << *m_nameAppendBytes << ", ";
+      }
+      if (m_nameAppendSeqNum) {
+        os << "NameAppendSequenceNumber=" << *m_nameAppendSeqNum << ", ";
+      }
+      if (m_canBePrefix) {
+        os << "CanBePrefix=" << m_canBePrefix << ", ";
+      }
+      if (m_mustBeFresh) {
+        os << "MustBeFresh=" << m_mustBeFresh << ", ";
+      }
+      if (m_nonceDuplicationPercentage > 0) {
+        os << "NonceDuplicationPercentage=" << m_nonceDuplicationPercentage << ", ";
+      }
+      if (m_interestLifetime >= 0_ms) {
+        os << "InterestLifetime=" << m_interestLifetime.count() << ", ";
+      }
+      if (m_nextHopFaceId > 0) {
+        os << "NextHopFaceId=" << m_nextHopFaceId << ", ";
+      }
+      if (m_expectedContent) {
+        os << "ExpectedContent=" << *m_expectedContent << ", ";
+      }
 
-      logger.log(detail, false, false);
+      auto str = os.str();
+      str = str.substr(0, str.length() - 2); // remove suffix ", "
+      logger.log(str, false, false);
     }
 
     bool
@@ -168,6 +180,9 @@ private:
       }
       else if (parameter == "NameAppendSequenceNumber") {
         m_nameAppendSeqNum = std::stoull(value);
+      }
+      else if (parameter == "CanBePrefix") {
+        m_canBePrefix = parseBoolean(value);
       }
       else if (parameter == "MustBeFresh") {
         m_mustBeFresh = parseBoolean(value);
@@ -202,6 +217,7 @@ private:
     std::string m_name;
     optional<std::size_t> m_nameAppendBytes;
     optional<uint64_t> m_nameAppendSeqNum;
+    bool m_canBePrefix = false;
     bool m_mustBeFresh = false;
     uint8_t m_nonceDuplicationPercentage = 0;
     time::milliseconds m_interestLifetime = -1_ms;
@@ -345,6 +361,7 @@ private:
     }
     interest.setName(name);
 
+    interest.setCanBePrefix(pattern.m_canBePrefix);
     interest.setMustBeFresh(pattern.m_mustBeFresh);
 
     static std::uniform_int_distribution<> duplicateNonceDist(1, 100);
