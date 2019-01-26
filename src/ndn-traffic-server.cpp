@@ -18,7 +18,6 @@
  * Author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  */
 
-#include "logger.hpp"
 #include "util.hpp"
 
 #include <ndn-cxx/data.hpp>
@@ -28,7 +27,6 @@
 #include <ndn-cxx/util/backports.hpp>
 #include <ndn-cxx/util/random.hpp>
 
-#include <cctype>
 #include <limits>
 #include <sstream>
 #include <vector>
@@ -57,12 +55,6 @@ public:
   {
   }
 
-  bool
-  hasError() const
-  {
-    return m_hasError;
-  }
-
   void
   setMaximumInterests(uint64_t maxInterests)
   {
@@ -82,15 +74,30 @@ public:
     m_wantQuiet = true;
   }
 
-  void
+  int
   run()
   {
     m_logger.initializeLog(to_string(random::generateWord32()));
-    initializeTrafficConfiguration();
+
+    if (!readConfigurationFile(m_configurationFile, m_trafficPatterns, m_logger)) {
+      return 2;
+    }
+
+    if (!checkTrafficPatternCorrectness()) {
+      m_logger.log("ERROR: Traffic configuration provided is not proper", false, true);
+      return 2;
+    }
+
+    m_logger.log("Traffic configuration file processing completed.\n", true, false);
+    for (std::size_t i = 0; i < m_trafficPatterns.size(); i++) {
+      m_logger.log("Traffic Pattern Type #" + to_string(i + 1), false, false);
+      m_trafficPatterns[i].printTrafficConfiguration(m_logger);
+      m_logger.log("", false, false);
+    }
 
     if (m_nMaximumInterests == 0) {
       logStatistics();
-      return;
+      return 0;
     }
 
     m_signalSet.async_wait([this] (const boost::system::error_code&, int) {
@@ -110,11 +117,12 @@ public:
 
     try {
       m_face.processEvents();
+      return m_hasError ? 1 : 0;
     }
     catch (const std::exception& e) {
       m_logger.log("ERROR: "s + e.what(), true, true);
-      m_hasError = true;
       m_ioService.stop();
+      return 1;
     }
   }
 
@@ -151,40 +159,39 @@ private:
     }
 
     bool
-    processConfigurationDetail(const std::string& detail, Logger& logger, int lineNumber)
+    parseConfigurationLine(const std::string& line, Logger& logger, int lineNumber)
     {
       std::string parameter, value;
-      if (parseParameterAndValue(detail, parameter, value)) {
-        if (parameter == "Name") {
-          m_name = value;
-        }
-        else if (parameter == "ContentDelay") {
-          m_contentDelay = time::milliseconds(std::stoul(value));
-        }
-        else if (parameter == "FreshnessPeriod") {
-          m_freshnessPeriod = time::milliseconds(std::stoul(value));
-        }
-        else if (parameter == "ContentType") {
-          m_contentType = std::stoul(value);
-        }
-        else if (parameter == "ContentBytes") {
-          m_contentLength = std::stoul(value);
-        }
-        else if (parameter == "Content") {
-          m_content = value;
-        }
-        else if (parameter == "SigningInfo") {
-          m_signingInfo = security::SigningInfo(value);
-        }
-        else {
-          logger.log("Line " + to_string(lineNumber) +
-                     " - Unknown parameter '" + parameter + "'", false, true);
-        }
+      if (!extractParameterAndValue(line, parameter, value)) {
+        logger.log("Line " + to_string(lineNumber) + " - Invalid syntax: " + line,
+                   false, true);
+        return false;
+      }
+
+      if (parameter == "Name") {
+        m_name = value;
+      }
+      else if (parameter == "ContentDelay") {
+        m_contentDelay = time::milliseconds(std::stoul(value));
+      }
+      else if (parameter == "FreshnessPeriod") {
+        m_freshnessPeriod = time::milliseconds(std::stoul(value));
+      }
+      else if (parameter == "ContentType") {
+        m_contentType = std::stoul(value);
+      }
+      else if (parameter == "ContentBytes") {
+        m_contentLength = std::stoul(value);
+      }
+      else if (parameter == "Content") {
+        m_content = value;
+      }
+      else if (parameter == "SigningInfo") {
+        m_signingInfo = security::SigningInfo(value);
       }
       else {
-        logger.log("Line " + to_string(lineNumber) +
-                   " - Invalid traffic configuration line: " + detail, false, true);
-        return false;
+        logger.log("Line " + to_string(lineNumber) + " - Ignoring unknown parameter: " + parameter,
+                   false, true);
       }
       return true;
     }
@@ -226,86 +233,8 @@ private:
   bool
   checkTrafficPatternCorrectness() const
   {
+    // TODO
     return true;
-  }
-
-  void
-  parseConfigurationFile()
-  {
-    std::ifstream patternFile;
-    m_logger.log("Parsing traffic configuration file: " + m_configurationFile, true, true);
-
-    patternFile.open(m_configurationFile.data());
-    if (patternFile.is_open()) {
-      int lineNumber = 0;
-      std::string patternLine;
-      while (getline(patternFile, patternLine)) {
-        lineNumber++;
-        if (std::isalpha(patternLine[0])) {
-          DataTrafficConfiguration dataData;
-          bool shouldSkipLine = false;
-          if (dataData.processConfigurationDetail(patternLine, m_logger, lineNumber)) {
-            while (getline(patternFile, patternLine) && std::isalpha(patternLine[0])) {
-              lineNumber++;
-              if (!dataData.processConfigurationDetail(patternLine, m_logger, lineNumber)) {
-                shouldSkipLine = true;
-                break;
-              }
-            }
-            lineNumber++;
-          }
-          else {
-            shouldSkipLine = true;
-          }
-          if (!shouldSkipLine) {
-            if (dataData.checkTrafficDetailCorrectness()) {
-              m_trafficPatterns.push_back(dataData);
-            }
-          }
-        }
-      }
-      patternFile.close();
-
-      if (!checkTrafficPatternCorrectness()) {
-        m_logger.log("ERROR: Traffic configuration provided is not proper - " +
-                     m_configurationFile, false, true);
-        exit(2);
-      }
-
-      m_logger.log("Traffic configuration file processing completed.\n", true, false);
-      for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
-        m_logger.log("Traffic Pattern Type #" + to_string(patternId + 1), false, false);
-        m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
-        m_logger.log("", false, false);
-      }
-    }
-    else {
-      m_logger.log("ERROR: Unable to open traffic configuration file: " + m_configurationFile, false, true);
-      exit(2);
-    }
-  }
-
-  void
-  initializeTrafficConfiguration()
-  {
-    namespace fs = boost::filesystem;
-
-    fs::path configPath(m_configurationFile);
-    if (fs::exists(configPath)) {
-      if (fs::is_regular_file(configPath)) {
-        parseConfigurationFile();
-      }
-      else {
-        m_logger.log("ERROR: Traffic configuration file is not a regular file: " +
-                     m_configurationFile, false, true);
-        exit(2);
-      }
-    }
-    else {
-      m_logger.log("ERROR: Traffic configuration file does not exist: " +
-                   m_configurationFile, false, true);
-      exit(2);
-    }
   }
 
   static std::string
@@ -501,7 +430,5 @@ main(int argc, char* argv[])
     server.setQuietLogging();
   }
 
-  server.run();
-
-  return server.hasError() ? 1 : 0;
+  return server.run();
 }

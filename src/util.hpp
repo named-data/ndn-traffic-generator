@@ -21,13 +21,17 @@
 #ifndef NTG_UTIL_HPP
 #define NTG_UTIL_HPP
 
+#include "logger.hpp"
+
 #include <cctype>
 #include <string>
+
+#include <boost/algorithm/string/predicate.hpp>
 
 namespace ndn {
 
 static inline bool
-parseParameterAndValue(const std::string& input, std::string& parameter, std::string& value)
+extractParameterAndValue(const std::string& input, std::string& parameter, std::string& value)
 {
   static const std::string allowedCharacters = ":/+._-%";
   parameter = "";
@@ -54,6 +58,65 @@ parseParameterAndValue(const std::string& input, std::string& parameter, std::st
   }
 
   return !parameter.empty() && !value.empty() && i == input.length();
+}
+
+static inline bool
+parseBoolean(const std::string& input)
+{
+  if (boost::iequals(input, "no") || boost::iequals(input, "off") ||
+      boost::iequals(input, "false") || input == "0")
+    return false;
+
+  if (boost::iequals(input, "yes") || boost::iequals(input, "on") ||
+      boost::iequals(input, "true") || input == "1")
+    return true;
+
+  throw std::invalid_argument("'" + input + "' is not a valid boolean value");
+}
+
+template<typename TrafficConfigurationType>
+static inline bool
+readConfigurationFile(const std::string& filename,
+                      std::vector<TrafficConfigurationType>& patterns,
+                      Logger& logger)
+{
+  std::ifstream patternFile(filename);
+  if (!patternFile) {
+    logger.log("ERROR: Unable to open traffic configuration file: " + filename, false, true);
+    return false;
+  }
+
+  logger.log("Reading traffic configuration file: " + filename, true, true);
+
+  int lineNumber = 0;
+  std::string patternLine;
+  while (getline(patternFile, patternLine)) {
+    lineNumber++;
+    if (std::isalpha(patternLine[0])) {
+      TrafficConfigurationType trafficConf;
+      bool shouldSkipLine = false;
+      if (trafficConf.parseConfigurationLine(patternLine, logger, lineNumber)) {
+        while (getline(patternFile, patternLine) && std::isalpha(patternLine[0])) {
+          lineNumber++;
+          if (!trafficConf.parseConfigurationLine(patternLine, logger, lineNumber)) {
+            shouldSkipLine = true;
+            break;
+          }
+        }
+        lineNumber++;
+      }
+      else {
+        shouldSkipLine = true;
+      }
+      if (!shouldSkipLine) {
+        if (trafficConf.checkTrafficDetailCorrectness()) {
+          patterns.push_back(std::move(trafficConf));
+        }
+      }
+    }
+  }
+
+  return true;
 }
 
 } // namespace ndn
