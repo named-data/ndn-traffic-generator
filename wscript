@@ -33,3 +33,10 @@ def build(bld):
 
     bld.install_files('${SYSCONFDIR}/ndn', ['ndn-traffic-client.conf.sample',
                                             'ndn-traffic-server.conf.sample'])
+
+    if Utils.unversioned_sys_platform() == 'linux':
+        systemd_units = bld.path.ant_glob('systemd/*.in')
+        bld(features='subst',
+            name='systemd-units',
+            source=systemd_units,
+            target=[u.change_ext('') for u in systemd_units])
