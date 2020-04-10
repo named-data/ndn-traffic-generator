@@ -1,5 +1,6 @@
-# ndn-traffic-generator: Traffic Generator for NDN
+# NDN Traffic Generator
 
+![Language](https://img.shields.io/badge/C%2B%2B-14-blue.svg)
 [![Build Status](https://travis-ci.org/named-data/ndn-traffic-generator.svg?branch=master)](https://travis-ci.org/named-data/ndn-traffic-generator)
 
 This tool is designed to generate Interest and Data traffic in an NDN network.
@@ -8,25 +9,20 @@ used to specify the pattern of NDN traffic that is required to be generated.
 Sample configuration files are provided which include instructions on how
 to configure various parameters.
 
-
 ## Prerequisites
 
 Compiling and running ndn-traffic-generator requires the following dependencies:
 
-1. ndn-cxx library <https://github.com/named-data/ndn-cxx>
-
-    For detailed installation instructions, please see
-    [`INSTALL.rst`](https://github.com/named-data/ndn-cxx/blob/master/docs/INSTALL.rst)
-
-2. NDN forwarding daemon <https://github.com/named-data/NFD>
-
+1. [ndn-cxx and its dependencies](https://named-data.net/doc/ndn-cxx/current/INSTALL.html)
+2. [NDN Forwarding Daemon (NFD)](https://named-data.net/doc/NFD/current/INSTALL.html)
 
 ## Compilation & Installation
 
-    ./waf configure
-    ./waf
-    sudo ./waf install
-
+```
+./waf configure
+./waf
+sudo ./waf install
+```
 
 ## Command Line Options
 
@@ -58,10 +54,9 @@ Compiling and running ndn-traffic-generator requires the following dependencies:
 * Please refer to the sample configuration files provided for details on how to create your own.
 * Use the command line options shown above to adjust traffic configuration.
 
+## Example
 
-### Sample Run Instructions
-
-##### ON MACHINE #1
+#### ON MACHINE #1
 
 (NFD must be running)
 
@@ -69,7 +64,7 @@ Start the traffic server:
 
         ndn-traffic-server ndn-traffic-server.conf
 
-##### ON MACHINE #2
+#### ON MACHINE #2
 
 (NFD must be running)
 

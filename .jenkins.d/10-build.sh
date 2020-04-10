@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-set -e
+set -ex
 
-JDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-source "$JDIR"/util.sh
+git submodule sync
+git submodule update --init
 
-set -x
+# Build in debug mode
+./waf --color=yes configure --debug
+./waf --color=yes build -j$WAF_JOBS
 
-sudo_preserve_env PATH -- ./waf --color=yes distclean
+# Cleanup
+./waf --color=yes distclean
 
+# Build in release mode
 ./waf --color=yes configure
-./waf --color=yes build -j${WAF_JOBS:-1}
+./waf --color=yes build -j$WAF_JOBS
 
+# Install
 sudo_preserve_env PATH -- ./waf --color=yes install
