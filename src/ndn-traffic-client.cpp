@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014-2019, Arizona Board of Regents.
+ * Copyright (c) 2014-2022, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -392,8 +392,7 @@ private:
     m_trafficPatterns[patternId].m_nInterestsReceived++;
 
     if (m_trafficPatterns[patternId].m_expectedContent) {
-      std::string receivedContent(reinterpret_cast<const char*>(data.getContent().value()),
-                                  data.getContent().value_size());
+      std::string receivedContent = readString(data.getContent());
       if (receivedContent != *m_trafficPatterns[patternId].m_expectedContent) {
         m_nContentInconsistencies++;
         m_trafficPatterns[patternId].m_nContentInconsistencies++;

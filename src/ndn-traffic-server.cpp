@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014-2019, Arizona Board of Regents.
+ * Copyright (c) 2014-2022, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -271,7 +271,7 @@ private:
         content = getRandomByteString(*pattern.m_contentLength);
       if (!pattern.m_content.empty())
         content = pattern.m_content;
-      data.setContent(reinterpret_cast<const uint8_t*>(content.data()), content.length());
+      data.setContent(makeStringBlock(tlv::Content, content));
 
       m_keyChain.sign(data, pattern.m_signingInfo);
 
