@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014-2019, Arizona Board of Regents.
+ * Copyright (c) 2014-2022, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@
  * Author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  */
 
-#ifndef NTG_UTIL_HPP
-#define NTG_UTIL_HPP
+#ifndef NDNTG_UTIL_HPP
+#define NDNTG_UTIL_HPP
 
 #include "logger.hpp"
 
@@ -28,9 +28,9 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-namespace ndn {
+namespace ndntg {
 
-static inline bool
+inline bool
 extractParameterAndValue(const std::string& input, std::string& parameter, std::string& value)
 {
   static const std::string allowedCharacters = ":/+._-%";
@@ -60,7 +60,7 @@ extractParameterAndValue(const std::string& input, std::string& parameter, std::
   return !parameter.empty() && !value.empty() && i == input.length();
 }
 
-static inline bool
+inline bool
 parseBoolean(const std::string& input)
 {
   if (boost::iequals(input, "no") || boost::iequals(input, "off") ||
@@ -75,7 +75,7 @@ parseBoolean(const std::string& input)
 }
 
 template<typename TrafficConfigurationType>
-static inline bool
+bool
 readConfigurationFile(const std::string& filename,
                       std::vector<TrafficConfigurationType>& patterns,
                       Logger& logger)
@@ -119,6 +119,6 @@ readConfigurationFile(const std::string& filename,
   return true;
 }
 
-} // namespace ndn
+} // namespace ndntg
 
-#endif // NTG_UTIL_HPP
+#endif // NDNTG_UTIL_HPP

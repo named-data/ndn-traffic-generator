@@ -22,13 +22,16 @@
 
 #include <ndn-cxx/data.hpp>
 #include <ndn-cxx/face.hpp>
+#include <ndn-cxx/interest.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
 #include <ndn-cxx/security/signing-info.hpp>
-#include <ndn-cxx/util/backports.hpp>
 #include <ndn-cxx/util/random.hpp>
+#include <ndn-cxx/util/time.hpp>
 
 #include <limits>
+#include <optional>
 #include <sstream>
+#include <string_view>
 #include <vector>
 
 #include <boost/asio/io_service.hpp>
@@ -40,8 +43,12 @@
 #include <boost/thread/thread.hpp>
 
 namespace po = boost::program_options;
+using namespace ndn::time_literals;
+using namespace std::string_literals;
 
-namespace ndn {
+namespace ndntg {
+
+namespace time = ndn::time;
 
 class NdnTrafficServer : boost::noncopyable
 {
@@ -77,7 +84,7 @@ public:
   int
   run()
   {
-    m_logger.initializeLog(to_string(random::generateWord32()));
+    m_logger.initializeLog(std::to_string(ndn::random::generateWord32()));
 
     if (!readConfigurationFile(m_configurationFile, m_trafficPatterns, m_logger)) {
       return 2;
@@ -90,7 +97,7 @@ public:
 
     m_logger.log("Traffic configuration file processing completed.\n", true, false);
     for (std::size_t i = 0; i < m_trafficPatterns.size(); i++) {
-      m_logger.log("Traffic Pattern Type #" + to_string(i + 1), false, false);
+      m_logger.log("Traffic Pattern Type #" + std::to_string(i + 1), false, false);
       m_trafficPatterns[i].printTrafficConfiguration(m_logger);
       m_logger.log("", false, false);
     }
@@ -110,9 +117,9 @@ public:
     for (std::size_t id = 0; id < m_trafficPatterns.size(); id++) {
       m_registeredPrefixes.push_back(
         m_face.setInterestFilter(m_trafficPatterns[id].m_name,
-                                 [=] (auto&&, const auto& interest) { this->onInterest(interest, id); },
+                                 [this, id] (auto&&, const auto& interest) { onInterest(interest, id); },
                                  nullptr,
-                                 [=] (auto&&, const auto& reason) { this->onRegisterFailed(reason, id); }));
+                                 [this, id] (auto&&, const auto& reason) { onRegisterFailed(reason, id); }));
     }
 
     try {
@@ -163,7 +170,7 @@ private:
     {
       std::string parameter, value;
       if (!extractParameterAndValue(line, parameter, value)) {
-        logger.log("Line " + to_string(lineNumber) + " - Invalid syntax: " + line,
+        logger.log("Line " + std::to_string(lineNumber) + " - Invalid syntax: " + line,
                    false, true);
         return false;
       }
@@ -187,10 +194,10 @@ private:
         m_content = value;
       }
       else if (parameter == "SigningInfo") {
-        m_signingInfo = security::SigningInfo(value);
+        m_signingInfo = ndn::security::SigningInfo(value);
       }
       else {
-        logger.log("Line " + to_string(lineNumber) + " - Ignoring unknown parameter: " + parameter,
+        logger.log("Line " + std::to_string(lineNumber) + " - Ignoring unknown parameter: " + parameter,
                    false, true);
       }
       return true;
@@ -206,10 +213,10 @@ private:
     std::string m_name;
     time::milliseconds m_contentDelay = -1_ms;
     time::milliseconds m_freshnessPeriod = -1_ms;
-    optional<uint32_t> m_contentType;
-    optional<std::size_t> m_contentLength;
+    std::optional<uint32_t> m_contentType;
+    std::optional<std::size_t> m_contentLength;
     std::string m_content;
-    security::SigningInfo m_signingInfo;
+    ndn::security::SigningInfo m_signingInfo;
     uint64_t m_nInterestsReceived = 0;
   };
 
@@ -218,15 +225,15 @@ private:
   {
     m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
     m_logger.log("Total Traffic Pattern Types = " +
-                 to_string(m_trafficPatterns.size()), false, true);
+                 std::to_string(m_trafficPatterns.size()), false, true);
     m_logger.log("Total Interests Received    = " +
-                 to_string(m_nInterestsReceived), false, true);
+                 std::to_string(m_nInterestsReceived), false, true);
 
     for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
-      m_logger.log("\nTraffic Pattern Type #" + to_string(patternId + 1), false, true);
+      m_logger.log("\nTraffic Pattern Type #" + std::to_string(patternId + 1), false, true);
       m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
       m_logger.log("Total Interests Received    = " +
-                   to_string(m_trafficPatterns[patternId].m_nInterestsReceived) + "\n", false, true);
+                   std::to_string(m_trafficPatterns[patternId].m_nInterestsReceived) + "\n", false, true);
     }
   }
 
@@ -247,18 +254,18 @@ private:
     std::string s;
     s.reserve(length);
     for (std::size_t i = 0; i < length; i++) {
-      s += static_cast<char>(dist(random::getRandomNumberEngine()));
+      s += static_cast<char>(dist(ndn::random::getRandomNumberEngine()));
     }
     return s;
   }
 
   void
-  onInterest(const Interest& interest, std::size_t patternId)
+  onInterest(const ndn::Interest& interest, std::size_t patternId)
   {
     auto& pattern = m_trafficPatterns[patternId];
 
     if (!m_nMaximumInterests || m_nInterestsReceived < *m_nMaximumInterests) {
-      Data data(interest.getName());
+      ndn::Data data(interest.getName());
 
       if (pattern.m_freshnessPeriod >= 0_ms)
         data.setFreshnessPeriod(pattern.m_freshnessPeriod);
@@ -271,7 +278,7 @@ private:
         content = getRandomByteString(*pattern.m_contentLength);
       if (!pattern.m_content.empty())
         content = pattern.m_content;
-      data.setContent(makeStringBlock(tlv::Content, content));
+      data.setContent(ndn::makeStringBlock(ndn::tlv::Content, content));
 
       m_keyChain.sign(data, pattern.m_signingInfo);
 
@@ -279,9 +286,9 @@ private:
       pattern.m_nInterestsReceived++;
 
       if (!m_wantQuiet) {
-        auto logLine = "Interest received          - PatternType=" + to_string(patternId + 1) +
-                       ", GlobalID=" + to_string(m_nInterestsReceived) +
-                       ", LocalID=" + to_string(pattern.m_nInterestsReceived) +
+        auto logLine = "Interest received          - PatternType=" + std::to_string(patternId + 1) +
+                       ", GlobalID=" + std::to_string(m_nInterestsReceived) +
+                       ", LocalID=" + std::to_string(pattern.m_nInterestsReceived) +
                        ", Name=" + pattern.m_name;
         m_logger.log(logLine, true, false);
       }
@@ -304,7 +311,7 @@ private:
   void
   onRegisterFailed(const std::string& reason, std::size_t patternId)
   {
-    auto logLine = "Prefix registration failed - PatternType=" + to_string(patternId + 1) +
+    auto logLine = "Prefix registration failed - PatternType=" + std::to_string(patternId + 1) +
                    ", Name=" + m_trafficPatterns[patternId].m_name +
                    ", Reason=" + reason;
     m_logger.log(logLine, true, true);
@@ -328,25 +335,26 @@ private:
   boost::asio::io_service m_ioService;
   boost::asio::signal_set m_signalSet;
   Logger m_logger;
-  Face m_face;
-  KeyChain m_keyChain;
+  ndn::Face m_face;
+  ndn::KeyChain m_keyChain;
 
   std::string m_configurationFile;
-  optional<uint64_t> m_nMaximumInterests;
+  std::optional<uint64_t> m_nMaximumInterests;
   time::milliseconds m_contentDelay = 0_ms;
-  bool m_wantQuiet = false;
 
   std::vector<DataTrafficConfiguration> m_trafficPatterns;
-  std::vector<ScopedRegisteredPrefixHandle> m_registeredPrefixes;
+  std::vector<ndn::ScopedRegisteredPrefixHandle> m_registeredPrefixes;
   uint64_t m_nRegistrationsFailed = 0;
   uint64_t m_nInterestsReceived = 0;
+
+  bool m_wantQuiet = false;
   bool m_hasError = false;
 };
 
-} // namespace ndn
+} // namespace ndntg
 
 static void
-usage(std::ostream& os, const std::string& programName, const po::options_description& desc)
+usage(std::ostream& os, std::string_view programName, const po::options_description& desc)
 {
   os << "Usage: " << programName << " [options] <Traffic_Configuration_File>\n"
      << "\n"
@@ -406,7 +414,7 @@ main(int argc, char* argv[])
     return 2;
   }
 
-  ndn::NdnTrafficServer server(configFile);
+  ndntg::NdnTrafficServer server(configFile);
 
   if (vm.count("count") > 0) {
     int count = vm["count"].as<int>();
@@ -419,7 +427,7 @@ main(int argc, char* argv[])
 
   if (vm.count("delay") > 0) {
     ndn::time::milliseconds delay(vm["delay"].as<ndn::time::milliseconds::rep>());
-    if (delay < ndn::time::milliseconds::zero()) {
+    if (delay < 0_ms) {
       std::cerr << "ERROR: the argument for option '--delay' cannot be negative" << std::endl;
       return 2;
     }

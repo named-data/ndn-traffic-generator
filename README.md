@@ -1,7 +1,7 @@
 # NDN Traffic Generator
 
 [![CI](https://github.com/named-data/ndn-traffic-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/named-data/ndn-traffic-generator/actions/workflows/ci.yml)
-![Language](https://img.shields.io/badge/C%2B%2B-14-blue)
+![Language](https://img.shields.io/badge/C%2B%2B-17-blue)
 
 This tool is designed to generate Interest and Data traffic in an NDN network.
 The client and server tool accept traffic configuration files which can be

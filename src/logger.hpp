@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014-2019, Arizona Board of Regents.
+ * Copyright (c) 2014-2022, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@
  * Author: Jerald Paul Abraham <jeraldabraham@email.arizona.edu>
  */
 
-#ifndef NTG_LOGGER_HPP
-#define NTG_LOGGER_HPP
+#ifndef NDNTG_LOGGER_HPP
+#define NDNTG_LOGGER_HPP
 
 #include <cstdlib>
 #include <fstream>
@@ -28,7 +28,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-namespace ndn {
+namespace ndntg {
 
 class Logger
 {
@@ -74,12 +74,13 @@ public:
       return;
     }
 
-    if (boost::filesystem::exists(boost::filesystem::path(m_logLocation))) {
-      if (boost::filesystem::is_directory(boost::filesystem::path(m_logLocation))) {
-        std::string logFilename = m_logLocation + "/" + m_module + "_" + instanceId + ".log";
-        m_logFile.open(logFilename.data(), std::ofstream::out | std::ofstream::trunc);
+    boost::filesystem::path logdir(m_logLocation);
+    if (boost::filesystem::exists(logdir)) {
+      if (boost::filesystem::is_directory(logdir)) {
+        auto logfile = logdir / (m_module + '_' + instanceId + ".log");
+        m_logFile.open(logfile.string(), std::ofstream::out | std::ofstream::trunc);
         if (m_logFile.is_open()) {
-          std::cout << "Log file initialized: " << logFilename << std::endl;
+          std::cout << "Log file initialized: " << logfile << std::endl;
         }
         else {
           std::cout << "ERROR: Unable to initialize a log file at: " << m_logLocation << std::endl
@@ -104,8 +105,7 @@ private:
   static std::string
   getTimestamp()
   {
-    boost::posix_time::ptime now;
-    now = boost::posix_time::second_clock::local_time();
+    auto now = boost::posix_time::second_clock::local_time();
     return to_simple_string(now);
   }
 
@@ -115,6 +115,6 @@ private:
   std::ofstream m_logFile;
 };
 
-} // namespace ndn
+} // namespace ndntg
 
-#endif // NTG_LOGGER_HPP
+#endif // NDNTG_LOGGER_HPP
