@@ -18,7 +18,7 @@ Compiling and running ndn-traffic-generator requires the following dependencies:
 
 ## Compilation & Installation
 
-```
+```shell
 ./waf configure
 ./waf
 sudo ./waf install
@@ -26,7 +26,7 @@ sudo ./waf install
 
 ## Command Line Options
 
-#### ndn-traffic-server
+### `ndn-traffic-server`
 
     Usage: ndn-traffic-server [options] <Traffic_Configuration_File>
     Respond to Interests as per provided Traffic_Configuration_File.
@@ -38,7 +38,7 @@ sudo ./waf install
       -d [ --delay ] arg (=0) wait this amount of milliseconds before responding to each Interest
       -q [ --quiet ]          turn off logging of Interest reception/Data generation
 
-#### ndn-traffic-client
+### `ndn-traffic-client`
 
     Usage: ndn-traffic-client [options] <Traffic_Configuration_File>
     Generate Interest traffic as per provided Traffic_Configuration_File.
@@ -62,7 +62,9 @@ sudo ./waf install
 
 Start the traffic server:
 
-        ndn-traffic-server ndn-traffic-server.conf
+```shell
+ndn-traffic-server ndn-traffic-server.conf
+```
 
 #### ON MACHINE #2
 
@@ -70,4 +72,6 @@ Start the traffic server:
 
 Start the traffic client:
 
-        ndn-traffic-client ndn-traffic-client.conf
+```shell
+ndn-traffic-client ndn-traffic-client.conf
+```

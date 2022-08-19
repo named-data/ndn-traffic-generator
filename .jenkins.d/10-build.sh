@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
-set -ex
-
-git submodule sync
-git submodule update --init
+set -exo pipefail
 
 # Build in debug mode
 ./waf --color=yes configure --debug
-./waf --color=yes build -j$WAF_JOBS
+./waf --color=yes build
 
 # Cleanup
 ./waf --color=yes distclean
 
 # Build in release mode
 ./waf --color=yes configure
-./waf --color=yes build -j$WAF_JOBS
+./waf --color=yes build
 
 # Install
-sudo_preserve_env PATH -- ./waf --color=yes install
+sudo ./waf --color=yes install
