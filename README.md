@@ -13,8 +13,8 @@ to configure various parameters.
 
 Compiling and running ndn-traffic-generator requires the following dependencies:
 
-1. [ndn-cxx and its dependencies](https://named-data.net/doc/ndn-cxx/current/INSTALL.html)
-2. [NDN Forwarding Daemon (NFD)](https://named-data.net/doc/NFD/current/INSTALL.html)
+1. [ndn-cxx and its dependencies](https://docs.named-data.net/ndn-cxx/current/INSTALL.html)
+2. [NDN Forwarding Daemon (NFD)](https://docs.named-data.net/NFD/current/INSTALL.html)
 
 ## Compilation & Installation
 
@@ -75,3 +75,8 @@ Start the traffic client:
 ```shell
 ndn-traffic-client ndn-traffic-client.conf
 ```
+
+## License
+
+ndn-traffic-generator is free software distributed under the GNU General Public License version 3.
+See [`COPYING.md`](COPYING.md) for details.
