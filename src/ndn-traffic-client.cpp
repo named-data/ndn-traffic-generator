@@ -177,7 +177,7 @@ private:
       }
 
       if (parameter == "TrafficPercentage") {
-        m_trafficPercentage = std::stoul(value);
+        m_trafficPercentage = std::stouf(value);
       }
       else if (parameter == "Name") {
         m_name = value;
