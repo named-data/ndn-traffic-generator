@@ -184,7 +184,12 @@ private:
       }
 
       if (parameter == "TrafficPercentage") {
-        m_trafficPercentage = std::stoul(value);
+        m_trafficPercentage = std::stod(value);
+        if (!std::isfinite(m_trafficPercentage)) {
+          logger.log("Line " + std::to_string(lineNumber) +
+                     " - TrafficPercentage must be a finite floating point value", false, true);
+          return false;
+        }
       }
       else if (parameter == "Name") {
         m_name = value;
@@ -227,13 +232,13 @@ private:
     }
 
   public:
-    uint8_t m_trafficPercentage = 0;
+    double m_trafficPercentage = 0.0;
     std::string m_name;
     std::optional<std::size_t> m_nameAppendBytes;
     std::optional<uint64_t> m_nameAppendSeqNum;
     bool m_canBePrefix = false;
     bool m_mustBeFresh = false;
-    uint8_t m_nonceDuplicationPercentage = 0;
+    unsigned m_nonceDuplicationPercentage = 0;
     time::milliseconds m_interestLifetime = -1_ms;
     uint64_t m_nextHopFaceId = 0;
     std::optional<std::string> m_expectedContent;
@@ -339,8 +344,8 @@ private:
   generateRandomNameComponent(std::size_t length)
   {
     // per ISO C++ std, cannot instantiate uniform_int_distribution with uint8_t
-    static std::uniform_int_distribution<unsigned short> dist(std::numeric_limits<uint8_t>::min(),
-                                                              std::numeric_limits<uint8_t>::max());
+    static std::uniform_int_distribution<unsigned> dist(std::numeric_limits<uint8_t>::min(),
+                                                        std::numeric_limits<uint8_t>::max());
 
     ndn::Buffer buf(length);
     for (std::size_t i = 0; i < length; i++) {
@@ -369,7 +374,7 @@ private:
     interest.setCanBePrefix(pattern.m_canBePrefix);
     interest.setMustBeFresh(pattern.m_mustBeFresh);
 
-    static std::uniform_int_distribution<> duplicateNonceDist(1, 100);
+    static std::uniform_int_distribution<unsigned> duplicateNonceDist(1, 100);
     if (duplicateNonceDist(ndn::random::getRandomNumberEngine()) <= pattern.m_nonceDuplicationPercentage)
       interest.setNonce(getOldNonce());
     else
@@ -415,22 +420,22 @@ private:
       m_logger.log(logLine, true, false);
     }
 
-    double roundTripTime = (now - sentTime).count() / 1000000.0;
+    double rtt = time::duration_cast<time::nanoseconds>(now - sentTime).count() / 1e6;
     if (m_wantVerbose) {
       auto rttLine = "RTT                - Name=" + data.getName().toUri() +
-                     ", RTT=" + std::to_string(roundTripTime) + "ms";
+                     ", RTT=" + std::to_string(rtt) + "ms";
       m_logger.log(rttLine, true, false);
     }
-    if (m_minimumInterestRoundTripTime > roundTripTime)
-      m_minimumInterestRoundTripTime = roundTripTime;
-    if (m_maximumInterestRoundTripTime < roundTripTime)
-      m_maximumInterestRoundTripTime = roundTripTime;
-    if (m_trafficPatterns[patternId].m_minimumInterestRoundTripTime > roundTripTime)
-      m_trafficPatterns[patternId].m_minimumInterestRoundTripTime = roundTripTime;
-    if (m_trafficPatterns[patternId].m_maximumInterestRoundTripTime < roundTripTime)
-      m_trafficPatterns[patternId].m_maximumInterestRoundTripTime = roundTripTime;
-    m_totalInterestRoundTripTime += roundTripTime;
-    m_trafficPatterns[patternId].m_totalInterestRoundTripTime += roundTripTime;
+    if (m_minimumInterestRoundTripTime > rtt)
+      m_minimumInterestRoundTripTime = rtt;
+    if (m_maximumInterestRoundTripTime < rtt)
+      m_maximumInterestRoundTripTime = rtt;
+    if (m_trafficPatterns[patternId].m_minimumInterestRoundTripTime > rtt)
+      m_trafficPatterns[patternId].m_minimumInterestRoundTripTime = rtt;
+    if (m_trafficPatterns[patternId].m_maximumInterestRoundTripTime < rtt)
+      m_trafficPatterns[patternId].m_maximumInterestRoundTripTime = rtt;
+    m_totalInterestRoundTripTime += rtt;
+    m_trafficPatterns[patternId].m_totalInterestRoundTripTime += rtt;
 
     if (m_nMaximumInterests == globalRef) {
       stop();
@@ -477,10 +482,10 @@ private:
       return;
     }
 
-    static std::uniform_int_distribution<> trafficDist(1, 100);
-    int trafficKey = trafficDist(ndn::random::getRandomNumberEngine());
+    static std::uniform_real_distribution<> trafficDist(std::numeric_limits<double>::min(), 100.0);
+    double trafficKey = trafficDist(ndn::random::getRandomNumberEngine());
 
-    int cumulativePercentage = 0;
+    double cumulativePercentage = 0.0;
     std::size_t patternId = 0;
     for (; patternId < m_trafficPatterns.size(); patternId++) {
       auto& pattern = m_trafficPatterns[patternId];
