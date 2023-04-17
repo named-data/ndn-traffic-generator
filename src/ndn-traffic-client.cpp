@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014-2022, Arizona Board of Regents.
+ * Copyright (c) 2014-2023, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +43,6 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 
-namespace po = boost::program_options;
 using namespace ndn::time_literals;
 using namespace std::string_literals;
 
@@ -245,21 +244,19 @@ private:
   void
   logStatistics()
   {
+    using std::to_string;
+
     m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
-    m_logger.log("Total Traffic Pattern Types = " +
-                 std::to_string(m_trafficPatterns.size()), false, true);
-    m_logger.log("Total Interests Sent        = " +
-                 std::to_string(m_nInterestsSent), false, true);
-    m_logger.log("Total Responses Received    = " +
-                 std::to_string(m_nInterestsReceived), false, true);
-    m_logger.log("Total Nacks Received        = " +
-                 std::to_string(m_nNacks), false, true);
+    m_logger.log("Total Traffic Pattern Types = " + to_string(m_trafficPatterns.size()), false, true);
+    m_logger.log("Total Interests Sent        = " + to_string(m_nInterestsSent), false, true);
+    m_logger.log("Total Responses Received    = " + to_string(m_nInterestsReceived), false, true);
+    m_logger.log("Total Nacks Received        = " + to_string(m_nNacks), false, true);
 
     double loss = 0.0;
     if (m_nInterestsSent > 0) {
       loss = (m_nInterestsSent - m_nInterestsReceived) * 100.0 / m_nInterestsSent;
     }
-    m_logger.log("Total Interest Loss         = " + std::to_string(loss) + "%", false, true);
+    m_logger.log("Total Interest Loss         = " + to_string(loss) + "%", false, true);
 
     double average = 0.0;
     double inconsistency = 0.0;
@@ -267,41 +264,35 @@ private:
       average = m_totalInterestRoundTripTime / m_nInterestsReceived;
       inconsistency = m_nContentInconsistencies * 100.0 / m_nInterestsReceived;
     }
-    m_logger.log("Total Data Inconsistency    = " +
-                 std::to_string(inconsistency) + "%", false, true);
-    m_logger.log("Total Round Trip Time       = " +
-                 std::to_string(m_totalInterestRoundTripTime) + "ms", false, true);
-    m_logger.log("Average Round Trip Time     = " +
-                 std::to_string(average) + "ms\n", false, true);
+    m_logger.log("Total Data Inconsistency    = " + to_string(inconsistency) + "%", false, true);
+    m_logger.log("Total Round Trip Time       = " + to_string(m_totalInterestRoundTripTime) + "ms", false, true);
+    m_logger.log("Average Round Trip Time     = " + to_string(average) + "ms\n", false, true);
 
     for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
-      m_logger.log("Traffic Pattern Type #" + std::to_string(patternId + 1), false, true);
-      m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
-      m_logger.log("Total Interests Sent        = " +
-                   std::to_string(m_trafficPatterns[patternId].m_nInterestsSent), false, true);
-      m_logger.log("Total Responses Received    = " +
-                   std::to_string(m_trafficPatterns[patternId].m_nInterestsReceived), false, true);
-      m_logger.log("Total Nacks Received        = " +
-                   std::to_string(m_trafficPatterns[patternId].m_nNacks), false, true);
-      loss = 0;
-      if (m_trafficPatterns[patternId].m_nInterestsSent > 0) {
-        loss = m_trafficPatterns[patternId].m_nInterestsSent - m_trafficPatterns[patternId].m_nInterestsReceived;
-        loss *= 100.0;
-        loss /= m_trafficPatterns[patternId].m_nInterestsSent;
+      const auto& pattern = m_trafficPatterns[patternId];
+
+      m_logger.log("Traffic Pattern Type #" + to_string(patternId + 1), false, true);
+      pattern.printTrafficConfiguration(m_logger);
+      m_logger.log("Total Interests Sent        = " + to_string(pattern.m_nInterestsSent), false, true);
+      m_logger.log("Total Responses Received    = " + to_string(pattern.m_nInterestsReceived), false, true);
+      m_logger.log("Total Nacks Received        = " + to_string(pattern.m_nNacks), false, true);
+
+      loss = 0.0;
+      if (pattern.m_nInterestsSent > 0) {
+        loss = (pattern.m_nInterestsSent - pattern.m_nInterestsReceived) * 100.0 / pattern.m_nInterestsSent;
       }
-      m_logger.log("Total Interest Loss         = " + std::to_string(loss) + "%", false, true);
-      average = 0;
-      inconsistency = 0;
-      if (m_trafficPatterns[patternId].m_nInterestsReceived > 0) {
-        average = m_trafficPatterns[patternId].m_totalInterestRoundTripTime /
-                  m_trafficPatterns[patternId].m_nInterestsReceived;
-        inconsistency = m_trafficPatterns[patternId].m_nContentInconsistencies;
-        inconsistency *= 100.0 / m_trafficPatterns[patternId].m_nInterestsReceived;
+      m_logger.log("Total Interest Loss         = " + to_string(loss) + "%", false, true);
+
+      average = 0.0;
+      inconsistency = 0.0;
+      if (pattern.m_nInterestsReceived > 0) {
+        average = pattern.m_totalInterestRoundTripTime / pattern.m_nInterestsReceived;
+        inconsistency = pattern.m_nContentInconsistencies * 100.0 / pattern.m_nInterestsReceived;
       }
-      m_logger.log("Total Data Inconsistency    = " + std::to_string(inconsistency) + "%", false, true);
+      m_logger.log("Total Data Inconsistency    = " + to_string(inconsistency) + "%", false, true);
       m_logger.log("Total Round Trip Time       = " +
-                   std::to_string(m_trafficPatterns[patternId].m_totalInterestRoundTripTime) + "ms", false, true);
-      m_logger.log("Average Round Trip Time     = " + std::to_string(average) + "ms\n", false, true);
+                   to_string(pattern.m_totalInterestRoundTripTime) + "ms", false, true);
+      m_logger.log("Average Round Trip Time     = " + to_string(average) + "ms\n", false, true);
     }
   }
 
@@ -386,8 +377,8 @@ private:
   }
 
   void
-  onData(const ndn::Data& data, int globalRef, int localRef, std::size_t patternId,
-         const time::steady_clock::time_point& sentTime)
+  onData(const ndn::Interest&, const ndn::Data& data, int globalRef, int localRef,
+         std::size_t patternId, const time::steady_clock::time_point& sentTime)
   {
     auto logLine = "Data Received      - PatternType=" + std::to_string(patternId + 1) +
                    ", GlobalID=" + std::to_string(globalRef) +
@@ -452,7 +443,7 @@ private:
   }
 
   void
-  onTimeout(const ndn::Interest& interest, int globalRef, int localRef, int patternId)
+  onTimeout(const ndn::Interest& interest, int globalRef, int localRef, std::size_t patternId)
   {
     auto logLine = "Interest Timed Out - PatternType=" + std::to_string(patternId + 1) +
                    ", GlobalID=" + std::to_string(globalRef) +
@@ -478,25 +469,30 @@ private:
     int cumulativePercentage = 0;
     std::size_t patternId = 0;
     for (; patternId < m_trafficPatterns.size(); patternId++) {
-      cumulativePercentage += m_trafficPatterns[patternId].m_trafficPercentage;
+      auto& pattern = m_trafficPatterns[patternId];
+      cumulativePercentage += pattern.m_trafficPercentage;
       if (trafficKey <= cumulativePercentage) {
+        m_nInterestsSent++;
+        pattern.m_nInterestsSent++;
         auto interest = prepareInterest(patternId);
         try {
-          m_nInterestsSent++;
-          m_trafficPatterns[patternId].m_nInterestsSent++;
-          auto sentTime = time::steady_clock::now();
+          int globalRef = m_nInterestsSent;
+          int localRef = pattern.m_nInterestsSent;
           m_face.expressInterest(interest,
-                                 bind(&NdnTrafficClient::onData, this, _2, m_nInterestsSent,
-                                      m_trafficPatterns[patternId].m_nInterestsSent, patternId, sentTime),
-                                 bind(&NdnTrafficClient::onNack, this, _1, _2, m_nInterestsSent,
-                                      m_trafficPatterns[patternId].m_nInterestsSent, patternId),
-                                 bind(&NdnTrafficClient::onTimeout, this, _1, m_nInterestsSent,
-                                      m_trafficPatterns[patternId].m_nInterestsSent, patternId));
+            [=, now = time::steady_clock::now()] (auto&&... args) {
+              onData(std::forward<decltype(args)>(args)..., globalRef, localRef, patternId, now);
+            },
+            [=] (auto&&... args) {
+              onNack(std::forward<decltype(args)>(args)..., globalRef, localRef, patternId);
+            },
+            [=] (auto&&... args) {
+              onTimeout(std::forward<decltype(args)>(args)..., globalRef, localRef, patternId);
+            });
 
           if (!m_wantQuiet) {
             auto logLine = "Sending Interest   - PatternType=" + std::to_string(patternId + 1) +
                            ", GlobalID=" + std::to_string(m_nInterestsSent) +
-                           ", LocalID=" + std::to_string(m_trafficPatterns[patternId].m_nInterestsSent) +
+                           ", LocalID=" + std::to_string(pattern.m_nInterestsSent) +
                            ", Name=" + interest.getName().toUri();
             m_logger.log(logLine, true, false);
           }
@@ -555,6 +551,8 @@ private:
 };
 
 } // namespace ndntg
+
+namespace po = boost::program_options;
 
 static void
 usage(std::ostream& os, std::string_view programName, const po::options_description& desc)
