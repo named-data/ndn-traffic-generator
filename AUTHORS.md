@@ -7,6 +7,7 @@ If you would like to become a contributor to the official repository, please fol
 * Jerald Paul Abraham <https://www2.cs.arizona.edu/~jeraldabraham>
 * Alexander Afanasyev <https://users.cs.fiu.edu/~afanasyev>
 * Jing Guan <http://jennica.space>
+* Alexander Lane <https://github.com/awlane>
 * Spencer Lee <https://www.linkedin.com/in/spenlee>
 * Eric Newberry <https://ericnewberry.com>
 * Davide Pesavento <https://github.com/Pesa>

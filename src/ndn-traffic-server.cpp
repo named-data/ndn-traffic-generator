@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014-2022, Arizona Board of Regents.
+ * Copyright (c) 2014-2023, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,18 +31,16 @@
 #include <limits>
 #include <optional>
 #include <sstream>
-#include <string_view>
 #include <vector>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/signal_set.hpp>
-#include <boost/noncopyable.hpp>
+#include <boost/core/noncopyable.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include <boost/thread/thread.hpp>
 
-namespace po = boost::program_options;
 using namespace ndn::time_literals;
 using namespace std::string_literals;
 
@@ -54,11 +52,8 @@ class NdnTrafficServer : boost::noncopyable
 {
 public:
   explicit
-  NdnTrafficServer(const std::string& configFile)
-    : m_signalSet(m_ioService, SIGINT, SIGTERM)
-    , m_logger("NdnTrafficServer")
-    , m_face(m_ioService)
-    , m_configurationFile(configFile)
+  NdnTrafficServer(std::string configFile)
+    : m_configurationFile(std::move(configFile))
   {
   }
 
@@ -76,6 +71,12 @@ public:
   }
 
   void
+  setTimestampFormat(std::string format)
+  {
+    m_timestampFormat = std::move(format);
+  }
+
+  void
   setQuietLogging()
   {
     m_wantQuiet = true;
@@ -84,7 +85,7 @@ public:
   int
   run()
   {
-    m_logger.initializeLog(std::to_string(ndn::random::generateWord32()));
+    m_logger.initialize(std::to_string(ndn::random::generateWord32()), m_timestampFormat);
 
     if (!readConfigurationFile(m_configurationFile, m_trafficPatterns, m_logger)) {
       return 2;
@@ -95,7 +96,7 @@ public:
       return 2;
     }
 
-    m_logger.log("Traffic configuration file processing completed.\n", true, false);
+    m_logger.log("Traffic configuration file processing completed\n", true, false);
     for (std::size_t i = 0; i < m_trafficPatterns.size(); i++) {
       m_logger.log("Traffic Pattern Type #" + std::to_string(i + 1), false, false);
       m_trafficPatterns[i].printTrafficConfiguration(m_logger);
@@ -223,17 +224,19 @@ private:
   void
   logStatistics()
   {
-    m_logger.log("\n\n== Interest Traffic Report ==\n", false, true);
-    m_logger.log("Total Traffic Pattern Types = " +
-                 std::to_string(m_trafficPatterns.size()), false, true);
-    m_logger.log("Total Interests Received    = " +
-                 std::to_string(m_nInterestsReceived), false, true);
+    using std::to_string;
+
+    m_logger.log("\n\n== Traffic Report ==\n", false, true);
+    m_logger.log("Total Traffic Pattern Types = " + to_string(m_trafficPatterns.size()), false, true);
+    m_logger.log("Total Interests Received    = " + to_string(m_nInterestsReceived) + "\n", false, true);
 
     for (std::size_t patternId = 0; patternId < m_trafficPatterns.size(); patternId++) {
-      m_logger.log("\nTraffic Pattern Type #" + std::to_string(patternId + 1), false, true);
-      m_trafficPatterns[patternId].printTrafficConfiguration(m_logger);
+      const auto& pattern = m_trafficPatterns[patternId];
+
+      m_logger.log("Traffic Pattern Type #" + to_string(patternId + 1), false, true);
+      pattern.printTrafficConfiguration(m_logger);
       m_logger.log("Total Interests Received    = " +
-                   std::to_string(m_trafficPatterns[patternId].m_nInterestsReceived) + "\n", false, true);
+                   to_string(pattern.m_nInterestsReceived) + "\n", false, true);
     }
   }
 
@@ -286,10 +289,10 @@ private:
       pattern.m_nInterestsReceived++;
 
       if (!m_wantQuiet) {
-        auto logLine = "Interest received          - PatternType=" + std::to_string(patternId + 1) +
+        auto logLine = "Interest Received          - PatternType=" + std::to_string(patternId + 1) +
                        ", GlobalID=" + std::to_string(m_nInterestsReceived) +
                        ", LocalID=" + std::to_string(pattern.m_nInterestsReceived) +
-                       ", Name=" + pattern.m_name;
+                       ", Name=" + interest.getName().toUri();
         m_logger.log(logLine, true, false);
       }
 
@@ -332,13 +335,14 @@ private:
   }
 
 private:
+  Logger m_logger{"NdnTrafficServer"};
   boost::asio::io_service m_ioService;
-  boost::asio::signal_set m_signalSet;
-  Logger m_logger;
-  ndn::Face m_face;
+  boost::asio::signal_set m_signalSet{m_ioService, SIGINT, SIGTERM};
+  ndn::Face m_face{m_ioService};
   ndn::KeyChain m_keyChain;
 
   std::string m_configurationFile;
+  std::string m_timestampFormat;
   std::optional<uint64_t> m_nMaximumInterests;
   time::milliseconds m_contentDelay = 0_ms;
 
@@ -352,6 +356,8 @@ private:
 };
 
 } // namespace ndntg
+
+namespace po = boost::program_options;
 
 static void
 usage(std::ostream& os, std::string_view programName, const po::options_description& desc)
@@ -369,14 +375,16 @@ int
 main(int argc, char* argv[])
 {
   std::string configFile;
+  std::string timestampFormat;
 
   po::options_description visibleOptions("Options");
   visibleOptions.add_options()
     ("help,h",    "print this help message and exit")
-    ("count,c",   po::value<int>(), "maximum number of Interests to respond to")
+    ("count,c",   po::value<int64_t>(), "maximum number of Interests to respond to")
     ("delay,d",   po::value<ndn::time::milliseconds::rep>()->default_value(0),
                   "wait this amount of milliseconds before responding to each Interest")
-    ("quiet,q",   po::bool_switch(), "turn off logging of Interest reception/Data generation")
+    ("timestamp-format,t", po::value<std::string>(&timestampFormat), "format string for timestamp output")
+    ("quiet,q",   po::bool_switch(), "turn off logging of Interest reception and Data generation")
     ;
 
   po::options_description hiddenOptions;
@@ -414,12 +422,12 @@ main(int argc, char* argv[])
     return 2;
   }
 
-  ndntg::NdnTrafficServer server(configFile);
+  ndntg::NdnTrafficServer server(std::move(configFile));
 
   if (vm.count("count") > 0) {
-    int count = vm["count"].as<int>();
+    auto count = vm["count"].as<int64_t>();
     if (count < 0) {
-      std::cerr << "ERROR: the argument for option '--count' cannot be negative" << std::endl;
+      std::cerr << "ERROR: the argument for option '--count' cannot be negative\n";
       return 2;
     }
     server.setMaximumInterests(static_cast<uint64_t>(count));
@@ -428,10 +436,14 @@ main(int argc, char* argv[])
   if (vm.count("delay") > 0) {
     ndn::time::milliseconds delay(vm["delay"].as<ndn::time::milliseconds::rep>());
     if (delay < 0_ms) {
-      std::cerr << "ERROR: the argument for option '--delay' cannot be negative" << std::endl;
+      std::cerr << "ERROR: the argument for option '--delay' cannot be negative\n";
       return 2;
     }
     server.setContentDelay(delay);
+  }
+
+  if (!timestampFormat.empty()) {
+    server.setTimestampFormat(std::move(timestampFormat));
   }
 
   if (vm["quiet"].as<bool>()) {
