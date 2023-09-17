@@ -33,7 +33,7 @@
 #include <sstream>
 #include <vector>
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/core/noncopyable.hpp>
 #include <boost/program_options/options_description.hpp>
@@ -129,7 +129,7 @@ public:
     }
     catch (const std::exception& e) {
       m_logger.log("ERROR: "s + e.what(), true, true);
-      m_ioService.stop();
+      m_io.stop();
       return 1;
     }
   }
@@ -331,14 +331,14 @@ private:
   {
     logStatistics();
     m_face.shutdown();
-    m_ioService.stop();
+    m_io.stop();
   }
 
 private:
   Logger m_logger{"NdnTrafficServer"};
-  boost::asio::io_service m_ioService;
-  boost::asio::signal_set m_signalSet{m_ioService, SIGINT, SIGTERM};
-  ndn::Face m_face{m_ioService};
+  boost::asio::io_context m_io;
+  boost::asio::signal_set m_signalSet{m_io, SIGINT, SIGTERM};
+  ndn::Face m_face{m_io};
   ndn::KeyChain m_keyChain;
 
   std::string m_configurationFile;

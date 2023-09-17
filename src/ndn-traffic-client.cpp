@@ -33,7 +33,7 @@
 #include <vector>
 
 #include <boost/asio/deadline_timer.hpp>
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/core/noncopyable.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -117,8 +117,7 @@ public:
 
     m_signalSet.async_wait([this] (auto&&...) { stop(); });
 
-    boost::asio::deadline_timer timer(m_ioService,
-                                      boost::posix_time::millisec(m_interestInterval.count()));
+    boost::asio::deadline_timer timer(m_io, boost::posix_time::millisec(m_interestInterval.count()));
     timer.async_wait([this, &timer] (auto&&...) { generateTraffic(timer); });
 
     try {
@@ -127,7 +126,7 @@ public:
     }
     catch (const std::exception& e) {
       m_logger.log("ERROR: "s + e.what(), true, true);
-      m_ioService.stop();
+      m_io.stop();
       return 1;
     }
   }
@@ -541,14 +540,14 @@ private:
 
     logStatistics();
     m_face.shutdown();
-    m_ioService.stop();
+    m_io.stop();
   }
 
 private:
   Logger m_logger{"NdnTrafficClient"};
-  boost::asio::io_service m_ioService;
-  boost::asio::signal_set m_signalSet{m_ioService, SIGINT, SIGTERM};
-  ndn::Face m_face{m_ioService};
+  boost::asio::io_context m_io;
+  boost::asio::signal_set m_signalSet{m_io, SIGINT, SIGTERM};
+  ndn::Face m_face{m_io};
 
   std::string m_configurationFile;
   std::string m_timestampFormat;
