@@ -28,9 +28,11 @@
 #include <ndn-cxx/util/random.hpp>
 #include <ndn-cxx/util/time.hpp>
 
+#include <chrono>
 #include <limits>
 #include <optional>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 #include <boost/asio/io_context.hpp>
@@ -39,14 +41,13 @@
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
-#include <boost/thread/thread.hpp>
 
-using namespace ndn::time_literals;
-using namespace std::string_literals;
+using namespace std::chrono_literals;
 
 namespace ndntg {
 
-namespace time = ndn::time;
+using namespace ndn::time_literals;
+using namespace std::string_literals;
 
 class NdnTrafficServer : boost::noncopyable
 {
@@ -64,9 +65,9 @@ public:
   }
 
   void
-  setContentDelay(time::milliseconds delay)
+  setContentDelay(std::chrono::milliseconds delay)
   {
-    BOOST_ASSERT(delay >= 0_ms);
+    BOOST_ASSERT(delay >= 0ms);
     m_contentDelay = delay;
   }
 
@@ -146,7 +147,7 @@ private:
       if (!m_name.empty()) {
         os << "Name=" << m_name << ", ";
       }
-      if (m_contentDelay >= 0_ms) {
+      if (m_contentDelay >= 0ms) {
         os << "ContentDelay=" << m_contentDelay.count() << ", ";
       }
       if (m_freshnessPeriod >= 0_ms) {
@@ -180,10 +181,10 @@ private:
         m_name = value;
       }
       else if (parameter == "ContentDelay") {
-        m_contentDelay = time::milliseconds(std::stoul(value));
+        m_contentDelay = std::chrono::milliseconds(std::stoul(value));
       }
       else if (parameter == "FreshnessPeriod") {
-        m_freshnessPeriod = time::milliseconds(std::stoul(value));
+        m_freshnessPeriod = ndn::time::milliseconds(std::stoul(value));
       }
       else if (parameter == "ContentType") {
         m_contentType = std::stoul(value);
@@ -212,8 +213,8 @@ private:
 
   public:
     std::string m_name;
-    time::milliseconds m_contentDelay = -1_ms;
-    time::milliseconds m_freshnessPeriod = -1_ms;
+    std::chrono::milliseconds m_contentDelay{-1};
+    ndn::time::milliseconds m_freshnessPeriod{-1};
     std::optional<uint32_t> m_contentType;
     std::optional<std::size_t> m_contentLength;
     std::string m_content;
@@ -296,10 +297,10 @@ private:
         m_logger.log(logLine, true, false);
       }
 
-      if (pattern.m_contentDelay > 0_ms)
-        boost::this_thread::sleep_for(pattern.m_contentDelay);
-      if (m_contentDelay > 0_ms)
-        boost::this_thread::sleep_for(m_contentDelay);
+      if (pattern.m_contentDelay > 0ms)
+        std::this_thread::sleep_for(pattern.m_contentDelay);
+      if (m_contentDelay > 0ms)
+        std::this_thread::sleep_for(m_contentDelay);
 
       m_face.put(data);
     }
@@ -344,7 +345,7 @@ private:
   std::string m_configurationFile;
   std::string m_timestampFormat;
   std::optional<uint64_t> m_nMaximumInterests;
-  time::milliseconds m_contentDelay = 0_ms;
+  std::chrono::milliseconds m_contentDelay{0};
 
   std::vector<DataTrafficConfiguration> m_trafficPatterns;
   std::vector<ndn::ScopedRegisteredPrefixHandle> m_registeredPrefixes;
@@ -381,7 +382,7 @@ main(int argc, char* argv[])
   visibleOptions.add_options()
     ("help,h",    "print this help message and exit")
     ("count,c",   po::value<int64_t>(), "maximum number of Interests to respond to")
-    ("delay,d",   po::value<ndn::time::milliseconds::rep>()->default_value(0),
+    ("delay,d",   po::value<std::chrono::milliseconds::rep>()->default_value(0),
                   "wait this amount of milliseconds before responding to each Interest")
     ("timestamp-format,t", po::value<std::string>(&timestampFormat), "format string for timestamp output")
     ("quiet,q",   po::bool_switch(), "turn off logging of Interest reception and Data generation")
@@ -434,8 +435,8 @@ main(int argc, char* argv[])
   }
 
   if (vm.count("delay") > 0) {
-    ndn::time::milliseconds delay(vm["delay"].as<ndn::time::milliseconds::rep>());
-    if (delay < 0_ms) {
+    std::chrono::milliseconds delay(vm["delay"].as<std::chrono::milliseconds::rep>());
+    if (delay < 0ms) {
       std::cerr << "ERROR: the argument for option '--delay' cannot be negative\n";
       return 2;
     }

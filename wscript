@@ -24,8 +24,7 @@ def configure(conf):
     conf.check_cfg(package='libndn-cxx', args=['libndn-cxx >= 0.8.1', '--cflags', '--libs'],
                    uselib_store='NDN_CXX', pkg_config_path=pkg_config_path)
 
-    boost_libs = ['date_time', 'filesystem', 'program_options', 'thread']
-    conf.check_boost(lib=boost_libs, mt=True)
+    conf.check_boost(lib='date_time filesystem program_options', mt=True)
 
     conf.check_compiler_flags()
 
