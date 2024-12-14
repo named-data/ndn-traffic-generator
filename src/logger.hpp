@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014-2023, Arizona Board of Regents.
+ * Copyright (c) 2014-2024, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,14 +22,13 @@
 #define NDNTG_LOGGER_HPP
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <string_view>
 
 #include <boost/container/static_vector.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 
 #include <ndn-cxx/util/time.hpp>
 
@@ -95,9 +94,9 @@ public:
       return;
     }
 
-    boost::filesystem::path logdir(m_logLocation);
-    if (boost::filesystem::exists(logdir)) {
-      if (boost::filesystem::is_directory(logdir)) {
+    std::filesystem::path logdir(m_logLocation);
+    if (std::filesystem::exists(logdir)) {
+      if (std::filesystem::is_directory(logdir)) {
         auto logfile = logdir / (m_module + '_' + instanceId + ".log");
         m_logFile.open(logfile.string(), std::ofstream::out | std::ofstream::trunc);
         if (m_logFile.is_open()) {
