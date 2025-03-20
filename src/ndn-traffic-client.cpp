@@ -1,6 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014-2023, Arizona Board of Regents.
+ * Copyright (c) 2014-2025, Arizona Board of Regents.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,26 +27,27 @@
 #include <ndn-cxx/util/random.hpp>
 #include <ndn-cxx/util/time.hpp>
 
+#include <chrono>
 #include <limits>
 #include <optional>
 #include <sstream>
 #include <vector>
 
-#include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/signal_set.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/core/noncopyable.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 
-using namespace ndn::time_literals;
-using namespace std::string_literals;
+using namespace std::chrono_literals;
 
 namespace ndntg {
 
+using namespace ndn::time_literals;
+using namespace std::string_literals;
 namespace time = ndn::time;
 
 class NdnTrafficClient : boost::noncopyable
@@ -65,9 +66,9 @@ public:
   }
 
   void
-  setInterestInterval(time::milliseconds interval)
+  setInterestInterval(std::chrono::milliseconds interval)
   {
-    BOOST_ASSERT(interval > 0_ms);
+    BOOST_ASSERT(interval > 0ms);
     m_interestInterval = interval;
   }
 
@@ -117,7 +118,7 @@ public:
 
     m_signalSet.async_wait([this] (auto&&...) { stop(); });
 
-    boost::asio::deadline_timer timer(m_io, boost::posix_time::millisec(m_interestInterval.count()));
+    boost::asio::steady_timer timer(m_io, m_interestInterval);
     timer.async_wait([this, &timer] (auto&&...) { generateTraffic(timer); });
 
     try {
@@ -475,7 +476,7 @@ private:
   }
 
   void
-  generateTraffic(boost::asio::deadline_timer& timer)
+  generateTraffic(boost::asio::steady_timer& timer)
   {
     if (m_nMaximumInterests && m_nInterestsSent >= *m_nMaximumInterests) {
       return;
@@ -515,7 +516,7 @@ private:
             m_logger.log(logLine, true, false);
           }
 
-          timer.expires_at(timer.expires_at() + boost::posix_time::millisec(m_interestInterval.count()));
+          timer.expires_at(timer.expiry() + m_interestInterval);
           timer.async_wait([this, &timer] (auto&&...) { generateTraffic(timer); });
         }
         catch (const std::exception& e) {
@@ -526,7 +527,7 @@ private:
     }
 
     if (patternId == m_trafficPatterns.size()) {
-      timer.expires_at(timer.expires_at() + boost::posix_time::millisec(m_interestInterval.count()));
+      timer.expires_at(timer.expiry() + m_interestInterval);
       timer.async_wait([this, &timer] (auto&&...) { generateTraffic(timer); });
     }
   }
@@ -552,7 +553,7 @@ private:
   std::string m_configurationFile;
   std::string m_timestampFormat;
   std::optional<uint64_t> m_nMaximumInterests;
-  time::milliseconds m_interestInterval = 1_s;
+  std::chrono::milliseconds m_interestInterval{1s};
 
   std::vector<InterestTrafficConfiguration> m_trafficPatterns;
   std::vector<uint32_t> m_nonces;
@@ -597,7 +598,7 @@ main(int argc, char* argv[])
   visibleOptions.add_options()
     ("help,h",      "print this help message and exit")
     ("count,c",     po::value<int64_t>(), "total number of Interests to be generated")
-    ("interval,i",  po::value<ndn::time::milliseconds::rep>()->default_value(1000),
+    ("interval,i",  po::value<std::chrono::milliseconds::rep>()->default_value(1000),
                     "Interest generation interval in milliseconds")
     ("timestamp-format,t", po::value<std::string>(&timestampFormat), "format string for timestamp output")
     ("quiet,q",     po::bool_switch(), "turn off logging of Interest generation and Data reception")
@@ -651,8 +652,8 @@ main(int argc, char* argv[])
   }
 
   if (vm.count("interval") > 0) {
-    ndn::time::milliseconds interval(vm["interval"].as<ndn::time::milliseconds::rep>());
-    if (interval <= 0_ms) {
+    std::chrono::milliseconds interval(vm["interval"].as<std::chrono::milliseconds::rep>());
+    if (interval <= 0ms) {
       std::cerr << "ERROR: the argument for option '--interval' must be positive\n";
       return 2;
     }
